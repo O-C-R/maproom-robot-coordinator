@@ -72,16 +72,16 @@ bool Robot::cvDetected() {
 }
 
 void Robot::update() {
-	// Test if we're getting data from the robot and from the camera
-	if (lastHeartbeatTime < 0 || ~commsUp()) {
+	if (lastHeartbeatTime < 0 || !commsUp()) {
 		state = R_NO_CONN;
-		return;
+		cmdStop(msg);
 	} else if (lastCameraUpdateTime < 0 || !cvDetected()) {
 		state = R_NO_CONN;
-		return;
+		cmdStop(msg);
+	} else if (state == R_START) {
+		// TODO: implement
+		cmdStop(msg);
 	}
 
-	if (state == R_START) {
-		
-	}
+	sendMessage(msg);
 }

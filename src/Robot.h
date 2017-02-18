@@ -70,6 +70,7 @@ public:
 	ofxUDPManager socket;
 	string lastMessage;
 	float lastHeartbeatTime;
+	char msg[128];
 
 	// Received from CV
 	ofVec3f tvec, rvec;
