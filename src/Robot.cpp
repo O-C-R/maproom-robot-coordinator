@@ -8,6 +8,9 @@
 
 #include "Robot.h"
 
+static const float kHeartbeatTimeoutSec = 2.0f;
+static const float kCameraTimeoutSec = 0.5f;
+
 void Robot::setCommunication(const string &rIp, int rPort) {
 	ip = rIp;
 	port = rPort;
@@ -27,7 +30,7 @@ void Robot::sendHeartbeat() {
 	lastHeartbeatTime = ofGetElapsedTimef();
 }
 
-void Robot::update(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix4x4 &cameraWorldInv) {
+void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix4x4 &cameraWorldInv) {
 	rvec = newRvec;
 	tvec = newTvec;
 
@@ -53,5 +56,32 @@ void Robot::update(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatri
 	// Rotate so values are always in 0-360
 	rot += 180.0;
 
-	lastUpdateTime = ofGetElapsedTimef();
+	lastCameraUpdateTime = ofGetElapsedTimef();
+}
+
+void Robot::gotHeartbeat() {
+	lastHeartbeatTime = ofGetElapsedTimef();
+}
+
+bool Robot::commsUp() {
+	return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
+}
+
+bool Robot::cvDetected() {
+	return ofGetElapsedTimef() - lastCameraUpdateTime < kCameraTimeoutSec;
+}
+
+void Robot::update() {
+	// Test if we're getting data from the robot and from the camera
+	if (lastHeartbeatTime < 0 || ~commsUp()) {
+		state = R_NO_CONN;
+		return;
+	} else if (lastCameraUpdateTime < 0 || !cvDetected()) {
+		state = R_NO_CONN;
+		return;
+	}
+
+	if (state == R_START) {
+		
+	}
 }

@@ -2,6 +2,8 @@
 
 static const float kMarkerSize = 0.2032f;
 
+char udpMessage[1024];
+
 //--------------------------------------------------------------
 void ofApp::setup(){
 	ofSetVerticalSync(true);
@@ -46,12 +48,48 @@ void ofApp::setup(){
 
 	// Listen for messages from camera
 	oscReceiver.setup( PORT );
+
+	// Listen for messages from the robots
+
+	robotReceiver.Create();
+	robotReceiver.Bind(5101);
+	robotReceiver.SetNonBlocking(true);
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
 	handleOSC();
+	receiveFromRobots();
 	commandRobots();
+}
+
+void ofApp::receiveFromRobots() {
+	int nChars = robotReceiver.Receive(robotMessage, 1024);
+	if (nChars > 0) {
+		robotMessage[nChars] = 0;
+
+		if (robotMessage[0] == 'R' && robotMessage[1] == 'B') {
+			char val = robotMessage[4];
+			robotMessage[4] = 0;
+			int robotId = atoi(robotMessage + 2);
+			robotMessage[4] = val;
+
+			if (robotsById.find(robotId) == robotsById.end()) {
+				cout << "Unknown robot: " << robotId << endl;
+				return;
+			}
+
+			Robot &r = *robotsById[robotId];
+
+			if (robotMessage[4] == 'H' && robotMessage[5] == 'B') {
+				r.gotHeartbeat();
+			} else {
+				cout << "Got unknown message from robot " << robotId << ": " << robotMessage + 4 << endl;
+			}
+		} else {
+			cout << "Unknown robot message: " << robotMessage << endl;
+		}
+	}
 }
 
 void ofApp::handleOSC() {
@@ -78,7 +116,7 @@ void ofApp::handleOSC() {
 					continue;
 				}
 
-				robotsByMarker[markerId]->update(rvec, tvec, cameraToWorldInv);
+				robotsByMarker[markerId]->updateCamera(rvec, tvec, cameraToWorldInv);
 			}
 		}
 	}
@@ -130,8 +168,10 @@ void ofApp::draw(){
 
 		// Debug output
 
-		sprintf(buf, "%d - posCm = (%+07.1f, %+07.1f) - heightCm = %+04.1f - rotDeg = %03.1f (%s)",
+		sprintf(buf, "%d - %s %s - posCm = (%+07.1f, %+07.1f) - heightCm = %+04.1f - rotDeg = %03.1f (%s)",
 				r.id,
+				r.commsUp() ? "CONNECTED" : "DISCONNECTED",
+				r.cvDetected() ? "SEEN" : "HIDDEN",
 				r.planePos.x * 100.0, r.planePos.y * 100.0,
 				r.worldPos.z * 100.0,
 				r.rot,

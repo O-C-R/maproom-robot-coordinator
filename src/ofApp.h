@@ -31,6 +31,7 @@ class ofApp : public ofBaseApp{
 		void gotMessage(ofMessage msg);
 
 	void handleOSC();
+	void receiveFromRobots();
 	void commandRobots();
 
 private:
@@ -42,6 +43,9 @@ private:
 
 	ofxOscReceiver oscReceiver;
 	ofxJSONElement jsonMsg;
+
+	ofxUDPManager robotReceiver;
+	char robotMessage[1024];
 
 	map<int, Robot*> robotsById;
 	map<int, Robot*> robotsByMarker;

@@ -18,7 +18,8 @@ typedef enum RobotState {
 	R_ROTATING_TO_ANGLE,
 	R_MOVING,
 	R_DRAWING,
-	R_STOPPED
+	R_STOPPED,
+	R_NO_CONN
 } RobotState;
 
 typedef enum PenState {
@@ -72,7 +73,7 @@ public:
 
 	// Received from CV
 	ofVec3f tvec, rvec;
-	float lastUpdateTime;
+	float lastCameraUpdateTime;
 
 	// Derived from CV
 	ofMatrix4x4 mat;
@@ -80,14 +81,31 @@ public:
 	ofVec2f planePos;
 	float rot;
 
-	Robot(int rId, int mId, const string &n) : id(rId), markerId(mId), name(n), state(R_START), penState(P_UNKNOWN) {}
+	Robot(int rId, int mId, const string &n) :
+		id(rId),
+		markerId(mId),
+		name(n),
+		state(R_NO_CONN),
+		penState(P_UNKNOWN),
+		lastCameraUpdateTime(-1),
+		lastHeartbeatTime(-1)
+	{}
 
+	// Setup communication - must be called before sending any messages
 	void setCommunication(const string &rIp, int rPort);
-
-	void update(const ofVec3f &rvec, const ofVec3f &tvec, const ofMatrix4x4 &cameraWorldInv);
-
 	void sendMessage(const string &message);
 	void sendHeartbeat();
+	void gotHeartbeat();
+
+	// Update from CV
+	void updateCamera(const ofVec3f &rvec, const ofVec3f &tvec, const ofMatrix4x4 &cameraWorldInv);
+
+	// Update during loop
+	void update();
+
+	bool commsUp();
+	bool cvDetected();
+
 };
 
 #endif
