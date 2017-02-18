@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ofMain.h"
-//#include "ofxCv.h"
 #include "ofxSVG.h"
 #include "ofxDatGui.h"
 #include "ofxOsc.h"
@@ -10,15 +9,71 @@
 
 #define PORT 5100
 
-//#include <opencv2/aruco/charuco.hpp>
-typedef struct {
-	int markerIdx;
+typedef enum RobotState {
+	R_START,
+	R_CALIBRATING_ANGLE,
+	R_ROTATING_TO_ANGLE,
+	R_MOVING,
+	R_DRAWING,
+	R_STOPPED
+} RobotState;
 
+typedef enum PenState {
+	P_UNKNOWN,
+	P_UP,
+	P_DOWN
+} PenState;
+
+typedef struct Robot {
+	// Required
+	int id;
+	string name;
+	int markerId;
+
+	// State machine
+	RobotState state;
+	PenState penState;
+
+	// Targets
+	float targetRot;
+	ofVec2f targetPlanePos;
+
+	// Communication
+	string ip;
+	int port;
+	ofxUDPManager socket;
+	string lastMessage;
+	float lastHeartbeatTime;
+
+	// Received from CV
 	ofVec3f tvec, rvec;
-	ofMatrix4x4 mat;
+	float lastUpdateTime;
 
+	// Derived from CV
+	ofMatrix4x4 mat;
 	ofVec3f worldPos;
+	ofVec2f planePos;
 	float rot;
+
+	Robot(int rId, int mId, const string &n) : id(rId), markerId(mId), name(n), state(R_START), penState(P_UNKNOWN) {}
+
+	void setCommunication(const string &rIp, int rPort) {
+		ip = rIp;
+		port = rPort;
+
+		socket.Create();
+		socket.Connect(ip.c_str(), port);
+		socket.SetNonBlocking(true);
+	}
+
+	void sendMessage(const string &message) {
+		socket.Send(message.c_str(), message.length());
+		lastMessage = message;
+	}
+
+	void sendHeartbeat() {
+		sendMessage("MRHB");
+	}
 } Robot;
 
 class ofApp : public ofBaseApp{
@@ -56,7 +111,9 @@ private:
 
 	ofxOscReceiver oscReceiver;
 	ofxJSONElement jsonMsg;
-	map<int, Robot> robots;
+
+	map<int, Robot*> robotsById;
+	map<int, Robot*> robotsByMarker;
 
 	ofxDatGui *gui;
 	ofxDatGuiToggle *robot01GoRot, *robot01GoPos;

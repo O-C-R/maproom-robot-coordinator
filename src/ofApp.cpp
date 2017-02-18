@@ -1,13 +1,26 @@
 #include "ofApp.h"
 
-
-static const int kFrameWait = 3;
-static const int kNumCornersCalibration = 15;
-static const int kImgWidth = 1980;
-static const int kImgHeight = 1080;
-
-static const int kRobot01Idx = 23;
 static const float kMarkerSize = 0.2032f;
+
+void cmdCalibrateAngle(char *buf, int measured) {
+	sprintf(buf, "MRCAL%+5d", measured);
+}
+
+void cmdRot(char *buf, int measured, int target) {
+	sprintf(buf, "MRROT%+5d%+5d", measured, target);
+}
+
+void cmdMove(char *buf, int angle, int magnitude) {
+	sprintf(buf, "MRMOV%+5d%+5d", angle, magnitude);
+}
+
+void cmdDraw(char *buf, int angle, int magnitude) {
+	sprintf(buf, "MRDRW%+5d%+5d", angle, magnitude);
+}
+
+void cmdStop(char *buf) {
+	sprintf(buf, "MRSTP");
+}
 
 //--------------------------------------------------------------
 void ofApp::setup(){
@@ -38,28 +51,32 @@ void ofApp::setup(){
 	cout << "mapSvg " << mapSvg.getWidth() << "x" << mapSvg.getHeight() << " w/ " << mapSvg.getNumPath() << endl;
 
 	gui = new ofxDatGui( ofxDatGuiAnchor::TOP_RIGHT );
-	robot01GoRot = gui->addToggle("robot01GoRot", false);
-	robot01GoPos = gui->addToggle("robot01GoPos", false);
-	robotCurRot = gui->addSlider("robotCurRot", -180, 180);
-	robotCurRot->setValue(0);
-	robotTargetRot = gui->addSlider("robotTargetRot", -180, 180);
-	robotTargetRot->setValue(0);
-	robotTargetPad = gui->add2dPad("robotTargetPad", ofRectangle(ofVec2f(-2), ofVec2f(2)));
-	robotPosPad = gui->add2dPad("robotPosPad", ofRectangle(ofVec2f(-2), ofVec2f(2)));
-	robotRotAccuracy = gui->addSlider("robotRotAccuracy", 0, 30);
-	robotRotAccuracy->setValue(5);
-	robotPosAccuracy = gui->addSlider("robotPosAccuracy", 0, 1);
-	robotPosAccuracy->setValue(0.1);
-	robotMovStrength = gui->addSlider("robotMovStrength", 0, 1000);
-	robotMovStrength->setValue(200);
-	robotRotStrength = gui->addSlider("robotRotStrength", 0, 1000);
-	robotRotStrength->setValue(70);
+//	robot01GoRot = gui->addToggle("robot01GoRot", false);
+//	robot01GoPos = gui->addToggle("robot01GoPos", false);
+//	robotCurRot = gui->addSlider("robotCurRot", -180, 180);
+//	robotCurRot->setValue(0);
+//	robotTargetRot = gui->addSlider("robotTargetRot", -180, 180);
+//	robotTargetRot->setValue(0);
+//	robotTargetPad = gui->add2dPad("robotTargetPad", ofRectangle(ofVec2f(-2), ofVec2f(2)));
+//	robotPosPad = gui->add2dPad("robotPosPad", ofRectangle(ofVec2f(-2), ofVec2f(2)));
+//	robotRotAccuracy = gui->addSlider("robotRotAccuracy", 0, 30);
+//	robotRotAccuracy->setValue(5);
+//	robotPosAccuracy = gui->addSlider("robotPosAccuracy", 0, 1);
+//	robotPosAccuracy->setValue(0.1);
+//	robotMovStrength = gui->addSlider("robotMovStrength", 0, 1000);
+//	robotMovStrength->setValue(200);
+//	robotRotStrength = gui->addSlider("robotRotStrength", 0, 1000);
+//	robotRotStrength->setValue(70);
 
-	// Connect to first robot
-	robot01.Create();
-	robot01.Connect("192.168.1.70",5111);
-	robot01.SetNonBlocking(true);
-	robotRotRolling = 0;
+	Robot *r01 = new Robot(1, 23, "Delmar");
+	robotsById[r01->id] = r01;
+	robotsByMarker[r01->markerId] = r01;
+	r01->setCommunication("192.168.1.70", 5111);
+
+	Robot *r02 = new Robot(1, 24, "Sarah");
+	robotsById[r02->id] = r02;
+	robotsByMarker[r02->markerId] = r02;
+	r02->setCommunication("192.168.1.71", 5111);
 
 	// Listen for messages from camera
 	oscReceiver.setup( PORT );
@@ -85,12 +102,17 @@ void ofApp::handleOSC() {
 			jsonMsg.parse(msg);
 			int nIds = jsonMsg["ids"].size();
 			for (int i = 0; i < nIds; ++i) {
-				int idx = jsonMsg["ids"][i].asInt();
+				int markerId = jsonMsg["ids"][i].asInt();
+				if (robotsByMarker.find(markerId) == robotsByMarker.end()) {
+					// Erroneous marker
+					continue;
+				}
+
+				Robot &r = *robotsByMarker[markerId];
+				r.lastUpdateTime = ofGetElapsedTimef();
+
 				ofVec3f rvec(jsonMsg["rvecs"][i][0].asFloat(), jsonMsg["rvecs"][i][1].asFloat(), jsonMsg["rvecs"][i][2].asFloat());
 				ofVec3f tvec(jsonMsg["tvecs"][i][0].asFloat(), jsonMsg["tvecs"][i][1].asFloat(), jsonMsg["tvecs"][i][2].asFloat());
-
-				Robot r;
-				r.markerIdx = idx;
 				r.rvec = rvec;
 				r.tvec = tvec;
 
@@ -107,64 +129,61 @@ void ofApp::handleOSC() {
 				r.mat = r.mat * cameraToWorld.getInverse();
 
 				r.worldPos = r.mat.getTranslation();
-				r.rot = r.mat.getRotate().getEuler().z;
+				r.planePos.set(r.worldPos.x, r.worldPos.y);
 
-				// Update GUI
-				robotPosPad->setPoint(ofVec2f(r.worldPos.x, r.worldPos.y));
-				robotCurRot->setValue(r.rot);
-
-				robots[idx] = r;
+				// Rotate so values are always in 0-360
+				r.rot = r.mat.getRotate().getEuler().z + 180.0;
 			}
 		}
 	}
 }
 
 void ofApp::commandRobots() {
-	for (auto &p : robots) {
-		int idx = p.first;
-		Robot &r = p.second;
+	char *buf = (char *)malloc(128 * sizeof(char));
 
-		if (idx == kRobot01Idx) {
-			bool didWrite = false;
-			char *buf = (char *)malloc(50 * sizeof(char));
-			ofVec2f pos2d = ofVec2f(r.worldPos.x, r.worldPos.y);
-			ofVec2f target2d = robotTargetPad->getPoint();
+	for (auto &p : robotsById) {
+		int id = p.first;
+		Robot &r = *p.second;
 
-			float targetRot = robotTargetRot->getValue();
-			float rotAccuracy = robotRotAccuracy->getValue();
-			float posAccuracy = robotPosAccuracy->getValue();
-			float rotStrength = robotRotStrength->getValue();
-			float movStrength = robotMovStrength->getValue();
-
-			robotRotRolling += (r.rot - robotRotRolling) * 0.05;
-
-			if (robot01GoRot->getChecked() && (r.rot > targetRot + rotAccuracy || r.rot < targetRot - rotAccuracy)) {
-				int angleVal = robotRotRolling > targetRot ? 500 - rotStrength : 500 + rotStrength;
-
-				sprintf((char *)buf, "MR01ROT%04d\n", angleVal);
-				didWrite = true;
-			} else if (robot01GoPos->getChecked() && pos2d.distance(target2d) > posAccuracy) {
-				ofVec2f go = target2d - pos2d;
-				go = go.normalize() * movStrength;
-
-				int goX = 500 - go.x;
-				int goY = 500 - go.y;
-
-				sprintf((char *)buf, "MR01MOV%04d%04d\n", goX, goY);
-				didWrite = true;
-			} else {
-				sprintf((char *)buf, "MR01SET050005000500\n");
-				didWrite = true;
-			}
-
-			if (didWrite) {
-				lastMessage = buf;
-				cout << "SENDING " << buf << endl;
-				robot01.Send(buf, strlen((char *)buf));
-			}
-			free(buf);
-		}
+//		bool didWrite = false;
+//		ofVec2f pos2d = ofVec2f(r.worldPos.x, r.worldPos.y);
+//		ofVec2f target2d = robotTargetPad->getPoint();
+//
+//		float targetRot = robotTargetRot->getValue();
+//		float rotAccuracy = robotRotAccuracy->getValue();
+//		float posAccuracy = robotPosAccuracy->getValue();
+//		float rotStrength = robotRotStrength->getValue();
+//		float movStrength = robotMovStrength->getValue();
+//
+//		robotRotRolling += (r.rot - robotRotRolling) * 0.05;
+//
+//		if (robot01GoRot->getChecked() && (r.rot > targetRot + rotAccuracy || r.rot < targetRot - rotAccuracy)) {
+//			int angleVal = robotRotRolling > targetRot ? 500 - rotStrength : 500 + rotStrength;
+//
+//			sprintf((char *)buf, "MR01ROT%04d\n", angleVal);
+//			didWrite = true;
+//		} else if (robot01GoPos->getChecked() && pos2d.distance(target2d) > posAccuracy) {
+//			ofVec2f go = target2d - pos2d;
+//			go = go.normalize() * movStrength;
+//
+//			int goX = 500 - go.x;
+//			int goY = 500 - go.y;
+//
+//			sprintf((char *)buf, "MR01MOV%04d%04d\n", goX, goY);
+//			didWrite = true;
+//		} else {
+//			sprintf((char *)buf, "MR01SET050005000500\n");
+//			didWrite = true;
+//		}
+//
+//		if (didWrite) {
+//			lastMessage = buf;
+//			cout << "SENDING " << buf << endl;
+//			robot01.Send(buf, strlen((char *)buf));
+//		}
 	}
+
+	free(buf);
 }
 
 //--------------------------------------------------------------
@@ -205,9 +224,9 @@ void ofApp::draw(){
 		corner4(0.0, kMarkerSize, 0.0),
 		up(0.0, 0.0, kMarkerSize);
 
-	for (map<int, Robot>::iterator it = robots.begin(); it != robots.end(); ++it) {
-		int idx = it->first;
-		Robot &r = it->second;
+	for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
+		int robotId = it->first;
+		Robot &r = *it->second;
 
 		ofVec3f c1 = corner1 * r.mat,
 			c2 = corner2 * r.mat,
@@ -215,8 +234,8 @@ void ofApp::draw(){
 			c4 = corner4 * r.mat,
 			u = up * r.mat;
 
-		posstr << idx << ": " << r.tvec << endl;
-		posstr << idx << ": " << c1*100.0 << " @ " << r.rot << endl;
+		posstr << r.name << "(" << r.id << "): cmPos = " << r.planePos * 100.0 << endl;
+		posstr << r.name << "(" << r.id << "): rot = " << r.rot << endl;
 
 		ofPushMatrix();
 		ofPushStyle();
