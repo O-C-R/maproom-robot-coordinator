@@ -41,10 +41,10 @@ void ofApp::setup(){
 	robotsByMarker[r01->markerId] = r01;
 	r01->setCommunication("192.168.1.70", 5111);
 
-	Robot *r02 = new Robot(2, 24, "Sarah");
-	robotsById[r02->id] = r02;
-	robotsByMarker[r02->markerId] = r02;
-	r02->setCommunication("192.168.1.71", 5111);
+//	Robot *r02 = new Robot(2, 24, "Sarah");
+//	robotsById[r02->id] = r02;
+//	robotsByMarker[r02->markerId] = r02;
+//	r02->setCommunication("192.168.1.71", 5111);
 
 	// Listen for messages from camera
 	oscReceiver.setup( PORT );
@@ -128,8 +128,7 @@ void ofApp::commandRobots() {
 	for (auto &p : robotsById) {
 		int id = p.first;
 		Robot &r = *p.second;
-
-		// TODO: send messages!
+		r.update();
 	}
 
 	free(buf);

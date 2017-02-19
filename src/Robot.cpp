@@ -12,9 +12,29 @@ static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
 
 static const float kCalibrationWaitSec = 1.0f;
-static const float kAngleWaitSec = 1.0f;
+static const float kAngleWaitSec = 2.0f;
 
-static const float kRotationTolerance = 2.0f;
+static const float kRotationTolerance = 10.0f;
+
+void cmdCalibrateAngle(char *buf, int measured) {
+	sprintf(buf, "MRCAL%+06d\n", measured);
+}
+
+void cmdRot(char *buf, int measured, int target) {
+	sprintf(buf, "MRROT%+06d%+06d\n", target, measured);
+}
+
+void cmdMove(char *buf, int angle, int magnitude) {
+	sprintf(buf, "MRMOV%+06d%+06d\n", angle, magnitude);
+}
+
+void cmdDraw(char *buf, int angle, int magnitude) {
+	sprintf(buf, "MRDRW%+06d%+06d\n", angle, magnitude);
+}
+
+void cmdStop(char *buf) {
+	sprintf(buf, "MRSTP\n");
+}
 
 void Robot::setCommunication(const string &rIp, int rPort) {
 	ip = rIp;
@@ -31,8 +51,7 @@ void Robot::sendMessage(const string &message) {
 }
 
 void Robot::sendHeartbeat() {
-	sendMessage("MRHB");
-	lastHeartbeatTime = ofGetElapsedTimef();
+	sendMessage("MRHB\n");
 }
 
 void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix4x4 &cameraWorldInv) {
@@ -56,10 +75,9 @@ void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const o
 	planePos.set(worldPos.x, worldPos.y);
 
 	// Get z-axis rotation
-	rot = mat.getRotate().getEuler().z;
-
-	// Rotate so values are always in 0-360
-	rot += 180.0;
+	ofVec3f yAxis = ofVec3f(0.0, 1.0, 0.0) * mat;
+	float yAxisAngle = atan2(yAxis.y, yAxis.x);
+	rot = ofRadToDeg(yAxisAngle) + 180.0;
 
 	lastCameraUpdateTime = ofGetElapsedTimef();
 }
@@ -77,6 +95,7 @@ bool Robot::cvDetected() {
 }
 
 void Robot::setState(RobotState newState) {
+	cout << "State change " << state << " to " << newState << endl;
 	state = newState;
 	stateStartTime = ofGetElapsedTimef();
 }
@@ -86,12 +105,18 @@ void Robot::update() {
 	float elapsedStateTime = ofGetElapsedTimef() - stateStartTime;
 
 	if (!commsUp()) {
-		setState(R_NO_CONN);
+		if (state != R_NO_CONN) {
+			cout << "Comms down, moving to NO_CONN" << endl;
+			setState(R_NO_CONN);
+		}
 
 		cmdStop(msg);
 		shouldSend = true;
 	} else if (!cvDetected()) {
-		setState(R_NO_CONN);
+		if (state != R_NO_CONN) {
+			cout << "CV down, moving to NO_CONN" << endl;
+			setState(R_NO_CONN);
+		}
 
 		cmdStop(msg);
 		shouldSend = true;
@@ -118,7 +143,7 @@ void Robot::update() {
 	} else if (state == R_ROTATING_TO_ANGLE) {
 		// We're rotating to a target angle
 
-		if (abs(rot - targetRot) > kRotationTolerance) {
+		if (abs(rot - targetRot) > kRotationTolerance && abs(360 - (rot - targetRot)) > kRotationTolerance) {
 			// Too far from angle, keep moving.
 			cmdRot(msg, rot, targetRot);
 			shouldSend = true;
@@ -129,7 +154,7 @@ void Robot::update() {
 	} else if (state == R_WAITING_ANGLE) {
 		// We're waiting after issuing rotate commands
 
-		if (abs(rot - targetRot) > kRotationTolerance) {
+		if (abs(rot - targetRot) > kRotationTolerance && abs(360 - (rot - targetRot)) > kRotationTolerance) {
 			// We're out of tolerance, try rotating again.
 			setState(R_ROTATING_TO_ANGLE);
 		} else if (elapsedStateTime > kAngleWaitSec) {
@@ -146,6 +171,7 @@ void Robot::update() {
 	}
 
 	if (shouldSend) {
+		cout << "SENDING " << msg;
 		sendMessage(msg);
 	}
 }

@@ -29,26 +29,6 @@ typedef enum PenState {
 	P_DOWN
 } PenState;
 
-void cmdCalibrateAngle(char *buf, int measured) {
-	sprintf(buf, "MRCAL%+5d", measured);
-}
-
-void cmdRot(char *buf, int measured, int target) {
-	sprintf(buf, "MRROT%+5d%+5d", measured, target);
-}
-
-void cmdMove(char *buf, int angle, int magnitude) {
-	sprintf(buf, "MRMOV%+5d%+5d", angle, magnitude);
-}
-
-void cmdDraw(char *buf, int angle, int magnitude) {
-	sprintf(buf, "MRDRW%+5d%+5d", angle, magnitude);
-}
-
-void cmdStop(char *buf) {
-	sprintf(buf, "MRSTP");
-}
-
 class Robot {
 
 public:
