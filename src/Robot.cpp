@@ -11,6 +11,11 @@
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
 
+static const float kCalibrationWaitSec = 1.0f;
+static const float kAngleWaitSec = 1.0f;
+
+static const float kRotationTolerance = 2.0f;
+
 void Robot::setCommunication(const string &rIp, int rPort) {
 	ip = rIp;
 	port = rPort;
@@ -71,17 +76,76 @@ bool Robot::cvDetected() {
 	return ofGetElapsedTimef() - lastCameraUpdateTime < kCameraTimeoutSec;
 }
 
+void Robot::setState(RobotState newState) {
+	state = newState;
+	stateStartTime = ofGetElapsedTimef();
+}
+
 void Robot::update() {
-	if (lastHeartbeatTime < 0 || !commsUp()) {
-		state = R_NO_CONN;
+	bool shouldSend = false;
+	float elapsedStateTime = ofGetElapsedTimef() - stateStartTime;
+
+	if (!commsUp()) {
+		setState(R_NO_CONN);
+
 		cmdStop(msg);
-	} else if (lastCameraUpdateTime < 0 || !cvDetected()) {
-		state = R_NO_CONN;
+		shouldSend = true;
+	} else if (!cvDetected()) {
+		setState(R_NO_CONN);
+
 		cmdStop(msg);
+		shouldSend = true;
+	} else if (state == R_NO_CONN) {
+		// Now connected and seen!
+		setState(R_START);
+
+		cmdStop(msg);
+		shouldSend = true;
 	} else if (state == R_START) {
-		// TODO: implement
+		// If we're started, immediately calibrate the angle
+
+		setState(R_CALIBRATING_ANGLE);
+	} else if (state == R_CALIBRATING_ANGLE) {
+		// We're calibrating the angle for a bit
+
+		cmdCalibrateAngle(msg, rot);
+		shouldSend = true;
+
+		if (elapsedStateTime >= kCalibrationWaitSec) {
+			// We've calibrated enough
+			setState(R_ROTATING_TO_ANGLE);
+		}
+	} else if (state == R_ROTATING_TO_ANGLE) {
+		// We're rotating to a target angle
+
+		if (abs(rot - targetRot) > kRotationTolerance) {
+			// Too far from angle, keep moving.
+			cmdRot(msg, rot, targetRot);
+			shouldSend = true;
+		} else {
+			// Close enough to angle, wait to see if the robot stays close enough.
+			setState(R_WAITING_ANGLE);
+		}
+	} else if (state == R_WAITING_ANGLE) {
+		// We're waiting after issuing rotate commands
+
+		if (abs(rot - targetRot) > kRotationTolerance) {
+			// We're out of tolerance, try rotating again.
+			setState(R_ROTATING_TO_ANGLE);
+		} else if (elapsedStateTime > kAngleWaitSec) {
+			// We've waited long enough, stop.
+			setState(R_STOPPED);
+
+			cmdStop(msg);
+			shouldSend = true;
+		}
+	} else if (state == R_STOPPED) {
+		// We're stopped. Stop.
 		cmdStop(msg);
+		shouldSend = true;
 	}
 
-	sendMessage(msg);
+	if (shouldSend) {
+		sendMessage(msg);
+	}
 }

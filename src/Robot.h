@@ -16,6 +16,7 @@ typedef enum RobotState {
 	R_START,
 	R_CALIBRATING_ANGLE,
 	R_ROTATING_TO_ANGLE,
+	R_WAITING_ANGLE,
 	R_MOVING,
 	R_DRAWING,
 	R_STOPPED,
@@ -59,6 +60,7 @@ public:
 	// State machine
 	RobotState state;
 	PenState penState;
+	float stateStartTime;
 
 	// Targets
 	float targetRot;
@@ -88,8 +90,11 @@ public:
 		name(n),
 		state(R_NO_CONN),
 		penState(P_UNKNOWN),
-		lastCameraUpdateTime(-1),
-		lastHeartbeatTime(-1)
+		targetRot(0),
+		targetPlanePos(0, 0),
+		stateStartTime(0),
+		lastCameraUpdateTime(-1000),
+		lastHeartbeatTime(-1000)
 	{}
 
 	// Setup communication - must be called before sending any messages
@@ -103,7 +108,9 @@ public:
 
 	// Update during loop
 	void update();
+	void setState(RobotState newState);
 
+	// Query robot state
 	bool commsUp();
 	bool cvDetected();
 
