@@ -70,7 +70,7 @@ public:
 		name(n),
 		state(R_NO_CONN),
 		penState(P_UNKNOWN),
-		targetRot(0),
+		targetRot(120),
 		targetPlanePos(0, 0),
 		stateStartTime(0),
 		lastCameraUpdateTime(-1000),

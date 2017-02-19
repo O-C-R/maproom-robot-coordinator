@@ -14,7 +14,8 @@ static const float kCameraTimeoutSec = 0.5f;
 static const float kCalibrationWaitSec = 1.0f;
 static const float kAngleWaitSec = 2.0f;
 
-static const float kRotationTolerance = 10.0f;
+static const float kRotationToleranceStart = 10.0f;
+static const float kRotationToleranceFinal = 3.0f;
 
 void cmdCalibrateAngle(char *buf, int measured) {
 	sprintf(buf, "MRCAL%+06d\n", measured);
@@ -104,6 +105,8 @@ void Robot::update() {
 	bool shouldSend = false;
 	float elapsedStateTime = ofGetElapsedTimef() - stateStartTime;
 
+	float rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
+
 	if (!commsUp()) {
 		if (state != R_NO_CONN) {
 			cout << "Comms down, moving to NO_CONN" << endl;
@@ -143,7 +146,7 @@ void Robot::update() {
 	} else if (state == R_ROTATING_TO_ANGLE) {
 		// We're rotating to a target angle
 
-		if (abs(rot - targetRot) > kRotationTolerance && abs(360 - (rot - targetRot)) > kRotationTolerance) {
+		if (abs(rotAngleDiff) > kRotationToleranceFinal) {
 			// Too far from angle, keep moving.
 			cmdRot(msg, rot, targetRot);
 			shouldSend = true;
@@ -154,7 +157,9 @@ void Robot::update() {
 	} else if (state == R_WAITING_ANGLE) {
 		// We're waiting after issuing rotate commands
 
-		if (abs(rot - targetRot) > kRotationTolerance && abs(360 - (rot - targetRot)) > kRotationTolerance) {
+		if (elapsedStateTime < kAngleWaitSec) {
+			// Pass
+		} else if (abs(rotAngleDiff) > kRotationToleranceFinal) {
 			// We're out of tolerance, try rotating again.
 			setState(R_ROTATING_TO_ANGLE);
 		} else if (elapsedStateTime > kAngleWaitSec) {
