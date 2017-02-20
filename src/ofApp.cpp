@@ -4,6 +4,14 @@ static const float kMarkerSize = 0.2032f;
 
 char udpMessage[1024];
 
+// values for GUI
+
+
+string guiRobotName;
+string guiRotationStatus;
+
+
+
 //--------------------------------------------------------------
 void ofApp::setup(){
 	ofSetVerticalSync(true);
@@ -15,9 +23,9 @@ void ofApp::setup(){
 	cam.setNearClip(0.01);
 
 	// on the pillar
-//	cameraPos = ofVec3f(0., 0., 2.03);
-//	cameraLook = ofVec3f(0.0, 0.82, 0.0);
-//	cameraToWorld.makeLookAtMatrix(cameraPos, cameraLook, ofVec3f(0.0, 0.0, 1.0));
+    //	cameraPos = ofVec3f(0., 0., 2.03);
+    //	cameraLook = ofVec3f(0.0, 0.82, 0.0);
+    //	cameraToWorld.makeLookAtMatrix(cameraPos, cameraLook, ofVec3f(0.0, 0.0, 1.0));
 
 	// on the map hanging thing
 	cameraPos = ofVec3f(0., 0., 2.845);
@@ -34,8 +42,6 @@ void ofApp::setup(){
 	mapSvg.load("map.svg");
 	cout << "mapSvg " << mapSvg.getWidth() << "x" << mapSvg.getHeight() << " w/ " << mapSvg.getNumPath() << endl;
 
-//	gui = new ofxDatGui( ofxDatGuiAnchor::TOP_RIGHT );
-
 	Robot *r01 = new Robot(1, 23, "Delmar");
 	robotsById[r01->id] = r01;
 	robotsByMarker[r01->markerId] = r01;
@@ -45,6 +51,39 @@ void ofApp::setup(){
 //	robotsById[r02->id] = r02;
 //	robotsByMarker[r02->markerId] = r02;
 //	r02->setCommunication("192.168.1.71", 5111);
+    
+    // set up GUI
+    gui = new ofxDatGui( ofxDatGuiAnchor::TOP_RIGHT );
+    gui->addHeader("St. Louis Maproom Console", false);
+    gui->addBreak();
+    
+    for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
+        int robotId = it->first;
+        Robot &r = *it->second;
+        gui->addLabel("Robot ID: " + ofToString(r.id));
+        gui->addLabel("Robot Name: " + ofToString(r.name.c_str()));
+        
+        float startingAngle = 0;
+        float startingDir = 0;
+        float startingMag = 0;
+        r.targetRot = startingAngle;
+        r.moveDir = startingDir;
+        r.moveMag = startingMag;
+        
+        gui->addToggle("Messages Enabled " + ofToString(r.id), false);
+        gui->addButton("Stop: " + ofToString(r.id));
+        gui->addButton("Calibrate: " + ofToString(r.id));
+        gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, startingAngle);
+        gui->addButton("Rotate: " + ofToString(r.id));
+        gui->addSlider("Move Dir: " + ofToString(r.id), 0, 360, startingDir);
+        gui->addSlider("Move Mag: " + ofToString(r.id), 0, 600, startingMag);
+        gui->addButton("Move: " + ofToString(r.id));
+        gui->addBreak();
+    }
+    
+    
+    gui->onButtonEvent(this, &ofApp::onButtonEvent);
+    gui->onSliderEvent(this, &ofApp::onSliderEvent);
 
 	// Listen for messages from camera
 	oscReceiver.setup( PORT );
@@ -54,6 +93,7 @@ void ofApp::setup(){
 	robotReceiver.Create();
 	robotReceiver.Bind(5101);
 	robotReceiver.SetNonBlocking(true);
+    
 }
 
 //--------------------------------------------------------------
@@ -176,6 +216,8 @@ void ofApp::draw(){
 				r.rot,
 				r.name.c_str());
 		posstr << buf << endl;
+        
+        
 
 		ofVec3f c1 = corner1 * r.mat;
 		ofVec3f c2 = corner2 * r.mat;
@@ -207,6 +249,59 @@ void ofApp::draw(){
 
 	ofSetColor(255, 255, 255);
 	ofDrawBitmapString(posstr.str(), 10, 15);
+}
+
+void ofApp::onToggleEvent(ofxDatGuiToggleEvent e)
+{
+    for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
+        int robotId = it->first;
+        Robot &r = *it->second;
+        if (e.target->is("messages enabled " + ofToString(r.id))) {
+            r.enableMessages = e.checked;
+        };
+    }
+}
+
+
+void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
+{
+    for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
+        int robotId = it->first;
+        Robot &r = *it->second;
+        
+        if (e.target->is("stop: " + ofToString(r.id))) {
+            r.stop();
+            cout << "STOPPING " << ofToString(r.id) << endl;
+        } else if (e.target->is("calibrate: " + ofToString(r.id))) {
+            r.calibrate();
+            cout << "CALIBRATING " << ofToString(r.id) << endl;
+        } else if (e.target->is("move: " + ofToString(r.id))) {
+            cout << "MOVING " << ofToString(r.id) << endl;
+            r.testMove(r.moveDir, r.moveMag);
+        } else if (e.target->is("rotate: " + ofToString(r.id))) {
+            cout << "ROTATING " << ofToString(r.id) << endl;
+            r.testRotate(r.targetRot);
+        }
+    }
+}
+
+void ofApp::onSliderEvent(ofxDatGuiSliderEvent e)
+{
+    for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
+        int robotId = it->first;
+        Robot &r = *it->second;
+        
+        if (e.target->is("rotation angle: " + ofToString(r.id))) {
+            cout << "set rotation angle of  " << e.value << endl;
+            r.targetRot = e.value;
+        } else if (e.target->is("move dir: " + ofToString(r.id))) {
+            cout << "move dir set to " << e.value << endl;
+            r.moveDir = e.value;
+        } else if (e.target->is("move mag: " + ofToString(r.id))) {
+            cout << "move mag set to " << e.value << endl;
+            r.moveMag = e.value;
+        }
+    }
 }
 
 //--------------------------------------------------------------

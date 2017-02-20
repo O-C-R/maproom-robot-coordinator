@@ -14,6 +14,8 @@ static const float kCameraTimeoutSec = 0.5f;
 static const float kCalibrationWaitSec = 1.0f;
 static const float kAngleWaitSec = 2.0f;
 
+static const float kMoveWaitSec = 2.0f;
+
 static const float kRotationToleranceStart = 10.0f;
 static const float kRotationToleranceFinal = 3.0f;
 
@@ -21,7 +23,7 @@ void cmdCalibrateAngle(char *buf, int measured) {
 	sprintf(buf, "MRCAL%+06d\n", measured);
 }
 
-void cmdRot(char *buf, int measured, int target) {
+void cmdRot(char *buf, int target, int measured) {
 	sprintf(buf, "MRROT%+06d%+06d\n", target, measured);
 }
 
@@ -54,6 +56,26 @@ void Robot::sendMessage(const string &message) {
 void Robot::sendHeartbeat() {
 	sendMessage("MRHB\n");
 }
+
+void Robot::calibrate() {
+    cmdCalibrateAngle(msg, rot);
+}
+
+void Robot::stop() {
+    setState(R_STOPPED);
+}
+
+void Robot::testRotate(float angle) {
+    targetRot = angle;
+    setState(R_ROTATING_TO_ANGLE);
+}
+
+void Robot::testMove(float direction, float magnitude) {
+    moveDir = direction;
+    moveMag = magnitude;
+    setState(R_MOVING);
+}
+
 
 void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix4x4 &cameraWorldInv) {
 	rvec = newRvec;
@@ -138,7 +160,7 @@ void Robot::update() {
 
 		cmdCalibrateAngle(msg, rot);
 		shouldSend = true;
-
+        
 		if (elapsedStateTime >= kCalibrationWaitSec) {
 			// We've calibrated enough
 			setState(R_ROTATING_TO_ANGLE);
@@ -148,7 +170,7 @@ void Robot::update() {
 
 		if (abs(rotAngleDiff) > kRotationToleranceFinal) {
 			// Too far from angle, keep moving.
-			cmdRot(msg, rot, targetRot);
+			cmdRot(msg, targetRot, rot);
 			shouldSend = true;
 		} else {
 			// Close enough to angle, wait to see if the robot stays close enough.
@@ -169,6 +191,18 @@ void Robot::update() {
 			cmdStop(msg);
 			shouldSend = true;
 		}
+    } else if (state == R_MOVING) {
+        // move in direction at magnitude
+        cmdMove(msg, moveDir, moveMag);
+        shouldSend = true;
+        
+        if (elapsedStateTime > kMoveWaitSec) {
+            setState(R_STOPPED);
+            
+            cmdStop(msg);
+            shouldSend = true;
+        }
+        
 	} else if (state == R_STOPPED) {
 		// We're stopped. Stop.
 		cmdStop(msg);
@@ -176,7 +210,9 @@ void Robot::update() {
 	}
 
 	if (shouldSend) {
-		cout << "SENDING " << msg;
-		sendMessage(msg);
+        if(enableMessages) {
+            cout << "SENDING " << msg;
+            sendMessage(msg);
+        }
 	}
 }

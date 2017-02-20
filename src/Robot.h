@@ -45,9 +45,14 @@ public:
 	// Targets
 	float targetRot;
 	ofVec2f targetPlanePos;
+    
+    // values to send
+    float moveDir;
+    float moveMag;
 
 	// Communication
-	string ip;
+    bool enableMessages;
+    string ip;
 	int port;
 	ofxUDPManager socket;
 	string lastMessage;
@@ -69,6 +74,7 @@ public:
 		markerId(mId),
 		name(n),
 		state(R_NO_CONN),
+        enableMessages(false),
 		penState(P_UNKNOWN),
 		targetRot(120),
 		targetPlanePos(0, 0),
@@ -93,6 +99,14 @@ public:
 	// Query robot state
 	bool commsUp();
 	bool cvDetected();
+    
+    // Set robot commands
+    void calibrate();
+    void stop();
+    
+    // test commands
+    void testRotate(float angle);
+    void testMove(float direction, float magnitude);
 
 };
 
