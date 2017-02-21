@@ -4,16 +4,10 @@ static const float kMarkerSize = 0.2032f;
 
 static const float MAP_W = 1000.0f;
 static const float MAP_H = 1000.0f;
+static const float OFFSET_X = 100.0f;
+static const float OFFSET_Y = 100.0f;
 
 char udpMessage[1024];
-
-// values for GUI
-
-
-string guiRobotName;
-string guiRotationStatus;
-
-
 
 //--------------------------------------------------------------
 void ofApp::setup(){
@@ -96,7 +90,7 @@ void ofApp::setup(){
     
     cout << "loading SVG" << endl;
     
-    Map *currentSVG = new Map(MAP_W, MAP_H);
+Map *currentSVG = new Map(MAP_W, MAP_H, OFFSET_X, OFFSET_Y);
     currentSVG->loadMap("map.svg");
 
 }

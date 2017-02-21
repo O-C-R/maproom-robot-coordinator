@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+    <g id="roads">
+        <g id="major_road">
+            <path d="M50.0,50.0L150.0,50.0L150,150L50.0,150L50,50" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M75.0,75.0L125.0,75.0L125.0,125.0L75.0,125.0L75.0,75.0" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M100.0,100.0L50.0,50.0" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M100.0,100.0L50.0,150" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M100.0,100.0L150.0,50" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M100.0,100.0L150.0,150.0" fill="none" stroke="black" stroke-width="3px"></path>
+        </g>
+    </g>
+</svg>

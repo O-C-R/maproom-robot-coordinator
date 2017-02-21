@@ -8,7 +8,7 @@
 
 #include "Map.h"
 
-Map::Map(float width, float height): widthM(width), heightM(height) {}
+Map::Map(float width, float height, float offsetX, float offsetY): widthM(width), heightM(height), offsetX(offsetX), offsetY(offsetY) {}
 
 void Map::storePath(string type, float startX, float startY, float destX, float destY) {
     int lineType;
@@ -31,23 +31,21 @@ void Map::storePath(string type, float startX, float startY, float destX, float 
         lineType = etc;
     }
     
-    
     MapPathSegment segment;
-    segment.start = ofVec2f(startX, startY);
-    segment.end = ofVec2f(destX, destY);
+    segment.start = ofVec2f(scaleX*startX + offsetX, scaleY*startY + offsetY);
+    segment.end = ofVec2f(scaleY*destX + offsetY, scaleY*destY + offsetY);
     mapPathStore[lineType].push_back(segment);
 }
 
-
 void Map::loadMap(const string filename) {
     currentMap.loadFile(filename);
-    widthSVG = stoi(ofToString(currentMap.getAttribute("svg", "width", "")));
-    heightSVG = stoi(ofToString(currentMap.getAttribute("svg", "height", "")));
+    scaleX = widthM / stoi(ofToString(currentMap.getAttribute("svg", "width", "")));
+    scaleY = heightM / stoi(ofToString(currentMap.getAttribute("svg", "height", "")));
     
     currentMap.pushTag("svg");
     int firstLevel = currentMap.getNumTags("g");
     for (int i = 0; i < firstLevel; i++) {
-        cout << "first_level id: " << currentMap.getAttribute("g", "id", "", i) << endl;
+//        cout << "first_level id: " << currentMap.getAttribute("g", "id", "", i) << endl;
         currentMap.pushTag("g", i);
         int secondLevel = currentMap.getNumTags("g");
         for (int j = 0; j < secondLevel; j++) {
@@ -98,7 +96,6 @@ void Map::loadMap(const string filename) {
                                 last_y = dest_y;
                                 startIndex = l+1;
                                 state = 5;
-                                cout << "to state " << state << endl;
                             } else if (path[l] == 'M') {
                                 endIndex = l-1;
                                 dest_y = stof(path.substr(startIndex, endIndex));
@@ -133,7 +130,7 @@ void Map::loadMap(const string filename) {
                             }
                             break;
                         default:
-                            cout << "unknown state" << endl;
+                            cout << "unknown state reached in Map.cpp" << endl;
                             break;
                     }
                     // reaches end of string
@@ -153,23 +150,35 @@ void Map::loadMap(const string filename) {
         currentMap.popTag();
     }
     currentMap.popTag();
-
-    
-    // TODO
-    
-	// Parse paths into MapPaths
-	// Add to array
-	// Rescale to size of map
 }
 
-bool hasNextPath() {
-	// TODO
-
-	return false;
+bool Map::checkNextPath() {
+    MapPath next;
+    for (int i = FIRST; i < LAST; i++) {
+        if(mapPathStore[i].size() > 0) {
+            next.id = i;
+            next.segment = mapPathStore[i].front();
+            nextPath = next;
+            mapPathStore[i].pop_front();
+            return true;
+        }
+    }
+    return false;
 }
 
-MapPath* nextPath() {
-	// TODO
-
-	return NULL;
+bool Map::checkNextPath(int pathType) {
+    MapPath next;
+    if (mapPathStore[pathType].size() > 0) {
+        next.id = pathType;
+        next.segment = mapPathStore[pathType].front();
+        mapPathStore[pathType].pop_front();
+        nextPath = next;
+        return true;
+    }
+    return false;
 }
+
+MapPath Map::getNextPath() {
+    return nextPath;
+}
+
