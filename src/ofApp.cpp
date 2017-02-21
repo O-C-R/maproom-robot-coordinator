@@ -1,7 +1,5 @@
 #include "ofApp.h"
 
-static const float kMarkerSize = 0.2032f;
-
 char udpMessage[1024];
 
 // values for GUI
@@ -81,7 +79,7 @@ void ofApp::setup(){
         gui->addBreak();
     }
     
-    
+    gui->onToggleEvent(this, &ofApp::onToggleEvent);
     gui->onButtonEvent(this, &ofApp::onButtonEvent);
     gui->onSliderEvent(this, &ofApp::onSliderEvent);
 
@@ -194,10 +192,11 @@ void ofApp::draw(){
 	}
 
 	ofVec3f corner1(0.0),
-		corner2(kMarkerSize, kMarkerSize, 0.0),
-		corner3(kMarkerSize, 0.0, 0.0),
-		corner4(0.0, kMarkerSize, 0.0),
-		up(0.0, 0.0, kMarkerSize);
+		corner2(kMarkerSizeM, kMarkerSizeM, 0.0),
+		corner3(kMarkerSizeM, 0.0, 0.0),
+		corner4(0.0, kMarkerSizeM, 0.0),
+		center(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0),
+		up(0.0, 0.0, kMarkerSizeM);
 
 	char buf[1024];
 
@@ -223,6 +222,7 @@ void ofApp::draw(){
 		ofVec3f c2 = corner2 * r.mat;
 		ofVec3f c3 = corner3 * r.mat;
 		ofVec3f c4 = corner4 * r.mat;
+		ofVec3f cen = center * r.mat;
 		ofVec3f u = up * r.mat;
 
 		ofPushMatrix();
@@ -233,15 +233,19 @@ void ofApp::draw(){
 //		ofDrawAxis(1.0);
 
 		// Option 2: draw a robot
-		ofSetColor(255, 255, 255);
+		ofSetColor(255, 255, 0);
 		ofDrawLine(c1, c3);
+		ofSetColor(255, 0, 0);
 		ofDrawLine(c1, c4);
+		ofSetColor(255, 255, 255);
 		ofDrawLine(c2, c3);
 		ofDrawLine(c2, c4);
-		ofSetColor(255, 255, 0);
-		ofDrawLine(c1, c2);
 		ofSetColor(0, 255, 255);
 		ofDrawLine(c1, u);
+
+		ofSetColor(255, 255, 255);
+		ofDrawSphere(cen, kMarkerSizeM / 4.0);
+
 		ofPopStyle();
 		ofPopMatrix();
 	}

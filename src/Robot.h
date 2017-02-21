@@ -12,6 +12,10 @@
 #include "ofMain.h"
 #include "ofxUDPManager.h"
 
+static const float kMetersPerInch = 0.0254;
+static const float kMarkerSizeIn = 5.0;
+static const float kMarkerSizeM = kMarkerSizeIn * kMetersPerInch;
+
 typedef enum RobotState {
 	R_START,
 	R_CALIBRATING_ANGLE,
@@ -41,6 +45,7 @@ public:
 	RobotState state;
 	PenState penState;
 	float stateStartTime;
+	int positionIdx;
 
 	// Targets
 	float targetRot;
@@ -80,7 +85,8 @@ public:
 		targetPlanePos(0, 0),
 		stateStartTime(0),
 		lastCameraUpdateTime(-1000),
-		lastHeartbeatTime(-1000)
+		lastHeartbeatTime(-1000),
+		positionIdx(0)
 	{}
 
 	// Setup communication - must be called before sending any messages
@@ -95,6 +101,9 @@ public:
 	// Update during loop
 	void update();
 	void setState(RobotState newState);
+
+	// States
+	void stateMove(char *msg, bool &shouldSend);
 
 	// Query robot state
 	bool commsUp();
