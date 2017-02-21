@@ -73,6 +73,9 @@ public:
 	ofVec3f worldPos;
 	ofVec2f planePos;
 	float rot;
+    
+    // navigation
+    ofVec2f targetPos;
 
 	Robot(int rId, int mId, const string &n) :
 		id(rId),
@@ -86,7 +89,8 @@ public:
 		stateStartTime(0),
 		lastCameraUpdateTime(-1000),
 		lastHeartbeatTime(-1000),
-		positionIdx(0)
+		positionIdx(0),
+        inPosition(false)
 	{}
 
 	// Setup communication - must be called before sending any messages
@@ -104,18 +108,24 @@ public:
 
 	// States
 	void stateMove(char *msg, bool &shouldSend);
+    bool inPosition;
 
 	// Query robot state
 	bool commsUp();
 	bool cvDetected();
+    bool readyForPath();
     
     // Set robot commands
     void calibrate();
     void stop();
+    void penUp();
+    void penDown();
     
     // test commands
     void testRotate(float angle);
     void testMove(float direction, float magnitude);
+    
+    void startMove(ofVec2f goal);
 
 };
 

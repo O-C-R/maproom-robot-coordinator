@@ -8,6 +8,8 @@
 
 #include "Robot.h"
 
+static const float kTolerance = 0.2f;
+
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
 
@@ -21,6 +23,7 @@ static const float kRotationToleranceFinal = 3.0f;
 
 const static float kSqSizeM = 0.25;
 const static int kNumPositions = 5;
+
 const static ofVec2f positions[] = {
 	{ 0.0, 0.0 },
 	{ -kSqSizeM, -kSqSizeM },
@@ -50,6 +53,14 @@ void cmdStop(char *buf) {
 	sprintf(buf, "MRSTP\n");
 }
 
+void cmdPenDown(char *buf) {
+    sprintf(buf, "MRPND\n");
+}
+
+void cmdPenUp(char *buf) {
+    sprintf(buf, "MRPNU\n");
+}
+
 void Robot::setCommunication(const string &rIp, int rPort) {
 	ip = rIp;
 	port = rPort;
@@ -77,6 +88,14 @@ void Robot::stop() {
 //    setState(R_STOPPED);
 	cmdStop(msg);
 	sendMessage(msg);
+}
+
+void Robot::penUp() {
+    cmdPenUp(msg);
+}
+
+void Robot::penDown() {
+    cmdPenDown(msg);
 }
 
 void Robot::testRotate(float angle) {
@@ -149,16 +168,17 @@ void Robot::setState(RobotState newState) {
 }
 
 void Robot::stateMove(char *msg, bool &shouldSend) {
-	ofVec2f target = positions[positionIdx];
+    ofVec2f target = targetPos;
 
 	ofVec2f dir = target - planePos;
 	float len = dir.length();
-
-	if (len < 0.02) {
-		if (++positionIdx >= kNumPositions) {
-			positionIdx = 0;
-		}
-	}
+    
+    if (len < kTolerance) {
+        state = R_STOPPED;
+        inPosition = true;
+    } else {
+        inPosition = false;
+    }
 
 	dir.normalize();
 	float mag = ofMap(len, 0, 1, 150, 250, true);
@@ -173,6 +193,19 @@ void Robot::stateMove(char *msg, bool &shouldSend) {
 	cout << planePos << endl;
 	cout << target << endl;
 	cout << msg << endl;
+}
+
+bool Robot::readyForPath() {
+    // TODO: make sure changing path mid moving doesn't mess up robot driving
+    if (state == R_STOPPED) {
+        return true;
+    }
+    return false;
+}
+
+void Robot::startMove(ofVec2f goal) {
+    targetPos = goal;
+    state = R_MOVING;
 }
 
 void Robot::update() {

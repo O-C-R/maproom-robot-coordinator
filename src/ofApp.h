@@ -40,7 +40,7 @@ class ofApp : public ofBaseApp{
 	void handleOSC();
 	void receiveFromRobots();
 	void commandRobots();
-
+    void robotConductor();
 
 private:
 	ofEasyCam cam;

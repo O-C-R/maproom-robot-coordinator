@@ -27,11 +27,11 @@ enum roadTypes {
 
 typedef struct MapPathSegment {
 	ofVec2f start, end;
-} MapPathSegment;
+} pathSegment;
 
 typedef struct MapPath {
 	int id;
-	MapPathSegment segment;
+	pathSegment segment;
 } MapPath;
 
 class Map {
@@ -46,7 +46,7 @@ public:
     
     ofxXmlSettings currentMap;
     
-    map<int, list<MapPathSegment>> mapPathStore;
+    map<int, list<pathSegment>> mapPathStore;
     
     void storePath(string type, float startX, float startY, float destX, float destY);
     

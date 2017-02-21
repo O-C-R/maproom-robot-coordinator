@@ -31,7 +31,7 @@ void Map::storePath(string type, float startX, float startY, float destX, float 
         lineType = etc;
     }
     
-    MapPathSegment segment;
+    pathSegment segment;
     segment.start = ofVec2f(scaleX*startX + offsetX, scaleY*startY + offsetY);
     segment.end = ofVec2f(scaleY*destX + offsetY, scaleY*destY + offsetY);
     mapPathStore[lineType].push_back(segment);
@@ -158,6 +158,8 @@ bool Map::checkNextPath() {
         if(mapPathStore[i].size() > 0) {
             next.id = i;
             next.segment = mapPathStore[i].front();
+            cout << "start: " << next.segment.start << endl;
+            cout << "end: " << next.segment.end << endl;
             nextPath = next;
             mapPathStore[i].pop_front();
             return true;
@@ -171,6 +173,8 @@ bool Map::checkNextPath(int pathType) {
     if (mapPathStore[pathType].size() > 0) {
         next.id = pathType;
         next.segment = mapPathStore[pathType].front();
+        cout << "start: " << next.segment.start << endl;
+        cout << "end: " << next.segment.end << endl;
         mapPathStore[pathType].pop_front();
         nextPath = next;
         return true;

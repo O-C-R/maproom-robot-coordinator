@@ -2,12 +2,21 @@
 
 static const float kMarkerSize = 0.2032f;
 
-static const float MAP_W = 1000.0f;
-static const float MAP_H = 1000.0f;
-static const float OFFSET_X = 100.0f;
-static const float OFFSET_Y = 100.0f;
+static const float MAP_W = 1.f;
+static const float MAP_H = 1.f;
+static const float OFFSET_X = -0.5f;
+static const float OFFSET_Y = -0.5f;
 
 char udpMessage[1024];
+
+Map *currentMap;
+
+MapPath nextPath;
+vector<MapPath> pathsDrawn;
+vector<vector<pathSegment>> robotPaths; // paths for reach robot, indexed by ID
+MapPath currentPath;
+bool toStart = true;
+bool getNextMap = false;
 
 //--------------------------------------------------------------
 void ofApp::setup(){
@@ -72,8 +81,13 @@ void ofApp::setup(){
         gui->addSlider("Move Dir: " + ofToString(r.id), 0, 360, startingDir);
         gui->addSlider("Move Mag: " + ofToString(r.id), 0, 600, startingMag);
         gui->addButton("Move: " + ofToString(r.id));
+        gui->addToggle("Pen Down: " + ofToString(r.id), false);
+        gui->addToggle("Drive Path: " + ofToString(r.id), false);
         gui->addBreak();
     }
+    gui->addBreak();
+//    gui->addLabel(ofToString("Current Path Ð X: " + ofToString(currentPath.segment.start[0]) + " Y: " + ofToString(currentPath.segment.start[1])));
+    gui->addButton("Get Next Path");
     
     gui->onToggleEvent(this, &ofApp::onToggleEvent);
     gui->onButtonEvent(this, &ofApp::onButtonEvent);
@@ -88,19 +102,52 @@ void ofApp::setup(){
 	robotReceiver.Bind(5101);
 	robotReceiver.SetNonBlocking(true);
     
-    cout << "loading SVG" << endl;
-    
-Map *currentSVG = new Map(MAP_W, MAP_H, OFFSET_X, OFFSET_Y);
-    currentSVG->loadMap("map.svg");
-
+    currentMap = new Map(MAP_W, MAP_H, OFFSET_X, OFFSET_Y);
+    currentMap->loadMap("map.svg");
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
 	handleOSC();
+    robotConductor();
 	receiveFromRobots();
 	commandRobots();
 }
+
+void ofApp::robotConductor() {
+    // have next path ready in queue
+    // wait to hear back from robots
+    // TODO: make this work for more than one robot
+    
+    
+    if(getNextMap) {
+        // checkNextPath pops front, so make sure to call it only when you want to get the next segment
+        if (currentMap->checkNextPath(major_road)) {
+            currentPath = currentMap->getNextPath();
+            pathsDrawn.push_back(currentPath);
+            cout << "path: " << currentPath.segment.start[0] << " " << currentPath.segment.start[1] << endl;
+            getNextMap = false;
+        }
+    }
+    
+//    for (auto &p : robotsById) {
+//        int id = p.first;
+//        Robot &r = *p.second;
+//        if (r.readyForPath()) {
+//            if (toStart) {
+//                r.startMove(currentPath.segment.start);
+//            } else {
+//                r.startMove(currentPath.segment.end);
+//                if (r.inPosition) {
+//                    // draw
+//                }
+//            }
+//        }
+//    }
+    
+    
+}
+
 
 void ofApp::receiveFromRobots() {
 	int nChars = robotReceiver.Receive(robotMessage, 1024);
@@ -199,8 +246,20 @@ void ofApp::draw(){
 		center(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0),
 		up(0.0, 0.0, kMarkerSizeM);
 
-	char buf[1024];
-
+    for (int path = 0; path < pathsDrawn.size(); path++) {
+//        ofPushMatrix();
+        ofPushStyle();
+        
+        ofSetColor(95, 255, 255);
+        ofVec3f lineStart = ofVec3f(pathsDrawn[path].segment.start[0], pathsDrawn[path].segment.start[1], 0);
+        ofVec3f lineEnd = ofVec3f(pathsDrawn[path].segment.end[0], pathsDrawn[path].segment.end[1], 0);
+        ofDrawLine(lineStart, lineEnd);
+        ofPopStyle();
+//        ofPopMatrix();
+    }
+     
+    char buf[1024];
+    
 	for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
 		int robotId = it->first;
 		Robot &r = *it->second;
@@ -263,7 +322,9 @@ void ofApp::onToggleEvent(ofxDatGuiToggleEvent e)
         Robot &r = *it->second;
         if (e.target->is("messages enabled " + ofToString(r.id))) {
             r.enableMessages = e.checked;
-        };
+        } else if (e.target->is("get next path")) {
+            
+        }
     }
 }
 
@@ -287,6 +348,9 @@ void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
             cout << "ROTATING " << ofToString(r.id) << endl;
             r.testRotate(r.targetRot);
         }
+    }
+    if (e.target->is("get next path")) {
+        getNextMap = true;
     }
 }
 
