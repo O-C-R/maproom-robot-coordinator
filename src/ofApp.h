@@ -1,13 +1,13 @@
 #pragma once
 
 #include "ofMain.h"
-#include "ofxSVG.h"
 #include "ofxDatGui.h"
 #include "ofxOsc.h"
 #include "ofxUDPManager.h"
 #include "ofxJSON.h"
 
 #include "Robot.h"
+#include "Map.h"
 
 #define PORT 5100
 
@@ -60,6 +60,5 @@ private:
 
 	ofxDatGui *gui;
     
-	ofxSVG mapSvg;
-
+    Map *currentMap;
 };

@@ -6,3 +6,4 @@ ofxNetwork
 ofxOsc
 ofxSvg
 ofxVectorGraphics
+ofxXmlSettings

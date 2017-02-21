@@ -1,5 +1,10 @@
 #include "ofApp.h"
 
+static const float kMarkerSize = 0.2032f;
+
+static const float MAP_W = 1000.0f;
+static const float MAP_H = 1000.0f;
+
 char udpMessage[1024];
 
 // values for GUI
@@ -36,9 +41,6 @@ void ofApp::setup(){
 	cameraToWorld.setTranslation(cameraPos);
 
 	cameraToWorldInv = cameraToWorld.getInverse();
-
-	mapSvg.load("map.svg");
-	cout << "mapSvg " << mapSvg.getWidth() << "x" << mapSvg.getHeight() << " w/ " << mapSvg.getNumPath() << endl;
 
 	Robot *r01 = new Robot(1, 23, "Delmar");
 	robotsById[r01->id] = r01;
@@ -92,6 +94,11 @@ void ofApp::setup(){
 	robotReceiver.Bind(5101);
 	robotReceiver.SetNonBlocking(true);
     
+    cout << "loading SVG" << endl;
+    
+    Map *currentSVG = new Map(MAP_W, MAP_H);
+    currentSVG->loadMap("map.svg");
+
 }
 
 //--------------------------------------------------------------

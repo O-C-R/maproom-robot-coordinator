@@ -9,12 +9,21 @@
 #ifndef Map_h
 #define Map_h
 
+#include "ofxXmlSettings.h"
 #include "ofMain.h"
 
-enum PathType {
-	PATH_ROAD,
-	PATH_BUILDING
+enum roadTypes {
+	major_road,
+	minor_road,
+    highway,
+    aerialway,
+    rail,
+    path,
+    ferry,
+    etc
 };
+
+
 
 typedef struct MapPathSegment {
 	ofVec2f start, end;
@@ -22,20 +31,27 @@ typedef struct MapPathSegment {
 
 typedef struct MapPath {
 	int id;
-	PathType type;
+	roadTypes type;
 	vector<MapPathSegment> segments;
 } MapPath;
+
 
 class Map {
 public:
 	Map(float widthM, float heightM);
-	void loadSVG(const string filename);
+	void loadMap(const string filename);
 
 	bool hasNextPath();
 	MapPath* nextPath();
-
+    
+    ofxXmlSettings currentMap;
+    
+    map<int, vector<MapPathSegment>> mapPathStore;
+    
+    void storePath(string type, float startX, float startY, float destX, float destY);
+    
 private:
-	float widthM, heightM;
+	float widthM, heightM, widthSVG, heightSVG;
 	vector<MapPath> paths;
 };
 
