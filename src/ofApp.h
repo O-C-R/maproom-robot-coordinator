@@ -41,6 +41,8 @@ class ofApp : public ofBaseApp{
 	void receiveFromRobots();
 	void commandRobots();
     void robotConductor();
+    
+    void loadMap(string name);
 
 private:
 	ofEasyCam cam;

@@ -1,5 +1,6 @@
 #include "ofApp.h"
 
+static const string currentFile = "test.svg";
 static const float kMarkerSize = 0.2032f;
 
 static const float MAP_W = 1.f;
@@ -11,12 +12,11 @@ char udpMessage[1024];
 
 Map *currentMap;
 
-MapPath nextPath;
 vector<MapPath> pathsDrawn;
 vector<vector<pathSegment>> robotPaths; // paths for reach robot, indexed by ID
 MapPath currentPath;
-bool toStart = true;
-bool getNextMap = false;
+bool movingToStart = true;
+bool getNextPath = false;
 
 //--------------------------------------------------------------
 void ofApp::setup(){
@@ -78,16 +78,17 @@ void ofApp::setup(){
         gui->addButton("Calibrate: " + ofToString(r.id));
         gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, startingAngle);
         gui->addButton("Rotate: " + ofToString(r.id));
-        gui->addSlider("Move Dir: " + ofToString(r.id), 0, 360, startingDir);
-        gui->addSlider("Move Mag: " + ofToString(r.id), 0, 600, startingMag);
-        gui->addButton("Move: " + ofToString(r.id));
+//        gui->addSlider("Move Dir: " + ofToString(r.id), 0, 360, startingDir);
+//        gui->addSlider("Move Mag: " + ofToString(r.id), 0, 600, startingMag);
+//        gui->addButton("Move: " + ofToString(r.id));
         gui->addToggle("Pen Down: " + ofToString(r.id), false);
-        gui->addToggle("Drive Path: " + ofToString(r.id), false);
+        gui->addButton("Drive Path: " + ofToString(r.id));
         gui->addBreak();
     }
     gui->addBreak();
 //    gui->addLabel(ofToString("Current Path Ð X: " + ofToString(currentPath.segment.start[0]) + " Y: " + ofToString(currentPath.segment.start[1])));
     gui->addButton("Get Next Path");
+    gui->addButton("Reload Map");
     
     gui->onToggleEvent(this, &ofApp::onToggleEvent);
     gui->onButtonEvent(this, &ofApp::onButtonEvent);
@@ -103,7 +104,7 @@ void ofApp::setup(){
 	robotReceiver.SetNonBlocking(true);
     
     currentMap = new Map(MAP_W, MAP_H, OFFSET_X, OFFSET_Y);
-    currentMap->loadMap("map.svg");
+    loadMap("test.svg");
 }
 
 //--------------------------------------------------------------
@@ -120,13 +121,13 @@ void ofApp::robotConductor() {
     // TODO: make this work for more than one robot
     
     
-    if(getNextMap) {
+    if(getNextPath) {
         // checkNextPath pops front, so make sure to call it only when you want to get the next segment
         if (currentMap->checkNextPath(major_road)) {
             currentPath = currentMap->getNextPath();
             pathsDrawn.push_back(currentPath);
             cout << "path: " << currentPath.segment.start[0] << " " << currentPath.segment.start[1] << endl;
-            getNextMap = false;
+            getNextPath = false;
         }
     }
     
@@ -134,7 +135,7 @@ void ofApp::robotConductor() {
 //        int id = p.first;
 //        Robot &r = *p.second;
 //        if (r.readyForPath()) {
-//            if (toStart) {
+//            if (movingToStart) {
 //                r.startMove(currentPath.segment.start);
 //            } else {
 //                r.startMove(currentPath.segment.end);
@@ -315,6 +316,12 @@ void ofApp::draw(){
 	ofDrawBitmapString(posstr.str(), 10, 15);
 }
 
+void ofApp::loadMap(string mapName) {
+    currentMap->loadMap(mapName);
+    pathsDrawn.clear();
+    getNextPath = false;
+}
+
 void ofApp::onToggleEvent(ofxDatGuiToggleEvent e)
 {
     for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
@@ -350,7 +357,10 @@ void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
         }
     }
     if (e.target->is("get next path")) {
-        getNextMap = true;
+        getNextPath = true;
+    } else if (e.target->is("reload map")) {
+        cout << "RELOADING MAP " << endl;
+        loadMap(currentFile);
     }
 }
 

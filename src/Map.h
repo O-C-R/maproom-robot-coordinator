@@ -49,6 +49,7 @@ public:
     map<int, list<pathSegment>> mapPathStore;
     
     void storePath(string type, float startX, float startY, float destX, float destY);
+    void clearStore();
     
 private:
 	float widthM, heightM, offsetX, offsetY, scaleX, scaleY;

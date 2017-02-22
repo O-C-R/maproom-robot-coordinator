@@ -37,10 +37,19 @@ void Map::storePath(string type, float startX, float startY, float destX, float 
     mapPathStore[lineType].push_back(segment);
 }
 
+void Map::clearStore() {
+    for (int i=FIRST; i < LAST; i++) {
+        mapPathStore[i].clear();
+    }
+    
+}
+
 void Map::loadMap(const string filename) {
     currentMap.loadFile(filename);
     scaleX = widthM / stoi(ofToString(currentMap.getAttribute("svg", "width", "")));
     scaleY = heightM / stoi(ofToString(currentMap.getAttribute("svg", "height", "")));
+    
+    clearStore();
     
     currentMap.pushTag("svg");
     int firstLevel = currentMap.getNumTags("g");
