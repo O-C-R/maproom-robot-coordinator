@@ -131,6 +131,7 @@ public:
     // Set robot commands
     void calibrate();
     void stop();
+    void start();
     
     // nav states
     void setPathType(int pathType);

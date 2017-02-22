@@ -8,7 +8,7 @@
 
 #include "Robot.h"
 
-static const float kTolerance = 0.02f;
+static const float kTolerance = 0.05f;
 
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
@@ -52,7 +52,7 @@ void cmdDraw(char *buf, int angle, int magnitude, int measured) {
 }
 
 void cmdStop(char *buf, bool penDown) {
-    sprintf(buf, "MRSTP%+01d\n", penDown ? 1 : 0);
+    sprintf(buf, "MRSTP%d\n", penDown ? 1 : 0);
 }
 
 void Robot::setCommunication(const string &rIp, int rPort) {
@@ -79,9 +79,14 @@ void Robot::calibrate() {
 }
 
 void Robot::stop() {
-//    setState(R_STOPPED);
+    setState(R_STOPPED);
     cmdStop(msg, (penState == P_UP ? true : false));
 	sendMessage(msg);
+}
+
+void Robot::start() {
+    setState(R_START);
+    
 }
 
 void Robot::testRotate(float angle) {
@@ -171,6 +176,7 @@ void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend)
         cmdMove(msg, angle, mag, rot);
     }
     
+    shouldSend = ofGetFrameNum() % 4 == 0;
 	cout << planePos << endl;
 	cout << target << endl;
 	cout << msg << endl;
@@ -198,20 +204,19 @@ void Robot::update() {
 	float elapsedStateTime = ofGetElapsedTimef() - stateStartTime;
 	float rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
 
-//	if (!enableMessages) {
-//		return;
-//	}
+	if (!enableMessages) {
+		return;
+	}
 
-//	if (!commsUp()) {
-//		if (state != R_NO_CONN) {
-//			cout << "Comms down, moving to NO_CONN" << endl;
-//			setState(R_NO_CONN);
-//		}
-//
-//		cmdStop(msg);
-//		shouldSend = true;
-//	} else
-	if (!cvDetected()) {
+	if (!commsUp()) {
+		if (state != R_NO_CONN) {
+			cout << "Comms down, moving to NO_CONN" << endl;
+			setState(R_NO_CONN);
+		}
+
+		cmdStop(msg, false);
+		shouldSend = true;
+	} else if (!cvDetected()) {
 		if (state != R_NO_CONN) {
 			cout << "CV down, moving to NO_CONN" << endl;
 			setState(R_NO_CONN);
@@ -304,6 +309,6 @@ void Robot::update() {
 	}
 
 	if (shouldSend && enableMessages) {
-//		sendMessage(msg);
+		sendMessage(msg);
 	}
 }

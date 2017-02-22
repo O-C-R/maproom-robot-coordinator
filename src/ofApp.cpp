@@ -15,7 +15,7 @@ char udpMessage[1024];
 Map *currentMap;
 
 vector<MapPath> pathsDrawn;
-vector<vector<pathSegment>> robotPaths; // paths for reach robot, indexed by ID
+vector<vector<ofVec2f>> robotPaths; // paths for reach robot, indexed by ID
 bool getNextPath = false;
 
 
@@ -77,20 +77,12 @@ void ofApp::setup(){
         
         gui->addToggle("Messages Enabled " + ofToString(r.id), false);
         gui->addButton("Stop: " + ofToString(r.id));
-        gui->addButton("Calibrate: " + ofToString(r.id));
-        gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, startingAngle);
-        gui->addButton("Rotate: " + ofToString(r.id));
-//        gui->addSlider("Move Dir: " + ofToString(r.id), 0, 360, startingDir);
-//        gui->addSlider("Move Mag: " + ofToString(r.id), 0, 600, startingMag);
-//        gui->addButton("Move: " + ofToString(r.id));
-//        gui->addToggle("Pen Down: " + ofToString(r.id), false);
-        gui->addButton("Drive Path: " + ofToString(r.id));
+        gui->addButton("Start: " + ofToString(r.id));
+//        gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, startingAngle);
+//        gui->addButton("Rotate: " + ofToString(r.id));
         gui->addButton("Start Drawing: " + ofToString(r.id));
         gui->addBreak();
     }
-    gui->addBreak();
-    gui->addBreak();
-    gui->addButton("Get Next Path");
     gui->addButton("Reload Map");
     
     gui->onToggleEvent(this, &ofApp::onToggleEvent);
@@ -142,6 +134,20 @@ void ofApp::robotConductor() {
         if (r.state == R_WAITING_TO_DRAW) {
             // todo: calibrate and do more things
             r.navState.drawReady = true;
+        } else if (r.state == R_DRAWING) {
+            ofVec2f current = ofVec2f(r.planePos.x, r.planePos.y);
+            if (robotPaths.size()) {
+                if (robotPaths[r.id].size()) {
+                    ofVec2f last = robotPaths[r.id].back();
+                    ofVec2f diff = current - last;
+                    float len = diff.length();
+                    if (len > 0.05) {
+                        robotPaths[r.id].push_back(current);
+                    }
+                } else {
+                    robotPaths[r.id].push_back(current);
+                }
+            }
         }
     }
     getNextPath = false;
@@ -245,35 +251,65 @@ void ofApp::draw(){
 		corner4(0.0, kMarkerSizeM, 0.0),
 		center(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0),
 		up(0.0, 0.0, kMarkerSizeM);
-
+     
+    char buf[1024];
+    
+    // draw paths
+    
+    // draw all paths
+    ofPushStyle();
+    ofSetColor(95, 255, 255);
     for (int path = 0; path < pathsDrawn.size(); path++) {
-//        ofPushMatrix();
-        ofPushStyle();
-        
-        ofSetColor(95, 255, 255);
         ofVec3f lineStart = ofVec3f(pathsDrawn[path].segment.start[0], pathsDrawn[path].segment.start[1], 0);
         ofVec3f lineEnd = ofVec3f(pathsDrawn[path].segment.end[0], pathsDrawn[path].segment.end[1], 0);
         ofDrawLine(lineStart, lineEnd);
-        ofPopStyle();
-//        ofPopMatrix();
     }
-     
-    char buf[1024];
+    ofPopStyle();
     
 	for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
 		int robotId = it->first;
 		Robot &r = *it->second;
-
+        
+        
+        // draw current path for the robot:
+        
+        ofPushStyle();
+        ofSetColor(255, 255, 0);
+        ofDrawLine(r.navState.start, r.navState.end);
+        // start = green
+        // end = red
+        ofSetColor(0, 255, 0);
+        ofDrawCircle(r.navState.start.x, r.navState.start.y, 0.02);
+        ofSetColor(255, 0, 0);
+        ofDrawCircle(r.navState.end.x, r.navState.end.y, 0.02);
+        ofPopStyle();
+        // draw total paths for the robot:
+        
+        ofSetColor(247, 0, 255);
+        if (robotPaths.size()) {
+            for (int i=0; i<robotPaths[r.id].size()-1; i++) {
+                ofVec2f curr = robotPaths[r.id][i];
+                ofVec2f next = robotPaths[r.id][i+1];
+                ofVec2f diff = curr - next;
+                if (diff.length() < 0.1) {
+                    ofDrawLine(curr, next);
+                }
+            }
+        }
+        
+        ofPopStyle();
+        
+        
 		// Debug output
 
 		sprintf(buf, "%d - %s %s - posCm = (%+07.1f, %+07.1f) - heightCm = %+04.1f - rotDeg = %03.1f (%s)",
-				r.id,
-				r.commsUp() ? "CONNECTED" : "DISCONNECTED",
-				r.cvDetected() ? "SEEN" : "HIDDEN",
-				r.planePos.x * 100.0, r.planePos.y * 100.0,
-				r.worldPos.z * 100.0,
-				r.rot,
-				r.name.c_str());
+            r.id,
+            r.commsUp() ? "CONNECTED" : "DISCONNECTED",
+            r.cvDetected() ? "SEEN" : "HIDDEN",
+            r.planePos.x * 100.0, r.planePos.y * 100.0,
+            r.worldPos.z * 100.0,
+            r.rot,
+            r.name.c_str());
 		posstr << buf << endl;
         
         
@@ -306,11 +342,12 @@ void ofApp::draw(){
 		ofSetColor(255, 255, 255);
 		ofDrawSphere(cen, kMarkerSizeM / 4.0);
 
+        
 		ofPopStyle();
 		ofPopMatrix();
 	}
 	cam.end();
-
+    
 	ofSetColor(255, 255, 255);
 	ofDrawBitmapString(posstr.str(), 10, 15);
 }
@@ -319,6 +356,13 @@ void ofApp::loadMap(string mapName) {
     currentMap->loadMap(mapName);
     pathsDrawn.clear();
     getNextPath = false;
+    
+    for (auto &p : robotsById) {
+        int id = p.first;
+        Robot &r = *p.second;
+        r.getInitial = true;
+    }
+
 }
 
 void ofApp::onToggleEvent(ofxDatGuiToggleEvent e)
@@ -353,6 +397,8 @@ void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
             r.testRotate(r.targetRot);
         } else if (e.target->is("start drawing: " + ofToString(r.id))) {
             r.navState.readyForNextPath = true;
+        } else if (e.target->is("start: " + ofToString(r.id))) {
+            r.start();
         }
     }
     if (e.target->is("get next path")) {
