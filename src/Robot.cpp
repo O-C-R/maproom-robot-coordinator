@@ -176,7 +176,7 @@ void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend)
         cmdMove(msg, angle, mag, rot);
     }
     
-    shouldSend = ofGetFrameNum() % 4 == 0;
+	shouldSend = true;
 	cout << planePos << endl;
 	cout << target << endl;
 	cout << msg << endl;
@@ -283,7 +283,6 @@ void Robot::update() {
         } else {
             // move is different from draw
             moveRobot(msg, navState.start, false, shouldSend);
-            shouldSend = true;
         }
     } else if (state == R_WAITING_TO_DRAW) {
         cout << "WAITING TO DRAW" << endl;
@@ -298,7 +297,6 @@ void Robot::update() {
             setState(R_DONE_DRAWING);
         } else {
             moveRobot(msg, navState.end, true, shouldSend);
-            shouldSend = true;
         }
     } else if (state == R_DONE_DRAWING) {
         cout << "DONE DRAWING" << endl;
@@ -314,6 +312,10 @@ void Robot::update() {
 		// We're stopped. Stop.
 		cmdStop(msg, false);
 		shouldSend = true;
+	}
+
+	if (shouldSend) {
+		shouldSend = ofGetFrameNum() % 4 == 0;
 	}
 
 	if (shouldSend && enableMessages) {
