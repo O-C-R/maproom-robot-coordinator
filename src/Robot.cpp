@@ -290,7 +290,6 @@ void Robot::update() {
     } else if (state == R_DRAWING) {
         cout << "DRAWING" << endl;
         if (inPosition(navState.end)) {
-            navState.readyForNextPath = true;
             setState(R_DONE_DRAWING);
         } else {
             moveRobot(msg, navState.end, true, shouldSend);
@@ -301,6 +300,10 @@ void Robot::update() {
         // we're stopped, pen is up
         cmdStop(msg, true);
         shouldSend = true;
+
+		if (elapsedStateTime > 1.0f) {
+			navState.readyForNextPath = true;
+		}
     } else if (state == R_STOPPED) {
         cout << "STOPPED" << endl;
 		// We're stopped. Stop.

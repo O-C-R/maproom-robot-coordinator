@@ -141,7 +141,7 @@ void ofApp::robotConductor() {
                     ofVec2f last = robotPaths[r.id].back();
                     ofVec2f diff = current - last;
                     float len = diff.length();
-                    if (len > 0.05) {
+                    if (len > 0.001) {
                         robotPaths[r.id].push_back(current);
                     }
                 } else {
