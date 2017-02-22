@@ -21,8 +21,10 @@ typedef enum RobotState {
 	R_CALIBRATING_ANGLE,
 	R_ROTATING_TO_ANGLE,
 	R_WAITING_ANGLE,
-	R_MOVING,
+	R_POSITIONING,
+    R_WAITING_TO_DRAW,
 	R_DRAWING,
+    R_DONE_DRAWING,
 	R_STOPPED,
 	R_NO_CONN
 } RobotState;
@@ -32,6 +34,16 @@ typedef enum PenState {
 	P_UP,
 	P_DOWN
 } PenState;
+
+// -> isWaiting -> movingToStart -> inPosition -> isDrawing -> isWaiting
+// sometimes -> isDrawing -> inPosition -> isDrawing (make sure not to lift pen up)
+
+typedef struct NavigationState {
+    int pathType;
+    bool drawReady, readyForNextPath;
+    ofVec2f start, end;
+} NavigationState;
+
 
 class Robot {
 
@@ -44,6 +56,7 @@ public:
 	// State machine
 	RobotState state;
 	PenState penState;
+    NavigationState navState;
 	float stateStartTime;
 	int positionIdx;
 
@@ -89,8 +102,7 @@ public:
 		stateStartTime(0),
 		lastCameraUpdateTime(-1000),
 		lastHeartbeatTime(-1000),
-		positionIdx(0),
-        inPosition(false)
+		positionIdx(0)
 	{}
 
 	// Setup communication - must be called before sending any messages
@@ -107,13 +119,12 @@ public:
 	void setState(RobotState newState);
 
 	// States
-	void stateMove(char *msg, bool &shouldSend);
-    bool inPosition;
+	void moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend);
+    bool inPosition(ofVec2f target);
 
 	// Query robot state
 	bool commsUp();
 	bool cvDetected();
-    bool readyForPath();
     
     // Set robot commands
     void calibrate();
@@ -121,12 +132,13 @@ public:
     void penUp();
     void penDown();
     
+    // nav states
+    void setPathType(int pathType);
+    void startNavigation(ofVec2f start, ofVec2f end);
+    
     // test commands
     void testRotate(float angle);
     void testMove(float direction, float magnitude);
-    
-    void startMove(ofVec2f goal);
-
 };
 
 #endif

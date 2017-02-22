@@ -13,6 +13,8 @@ static const float kTolerance = 0.2f;
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
 
+static const float kPenMovementTime = 0.1f;
+
 static const float kCalibrationWaitSec = 1.0f;
 static const float kAngleWaitSec = 2.0f;
 
@@ -45,12 +47,12 @@ void cmdMove(char *buf, int angle, int magnitude, int measured) {
 	sprintf(buf, "MRMOV%+06d%+06d%+06d\n", angle, magnitude, measured);
 }
 
-void cmdDraw(char *buf, int angle, int magnitude) {
-	sprintf(buf, "MRDRW%+06d%+06d\n", angle, magnitude);
+void cmdDraw(char *buf, int angle, int magnitude, int measured) {
+	sprintf(buf, "MRDRW%+06d%+06d%+06d\n", angle, magnitude, measured);
 }
 
-void cmdStop(char *buf) {
-	sprintf(buf, "MRSTP\n");
+void cmdStop(char *buf, bool penDown) {
+    sprintf(buf, "MRSTP%+01d\n", penDown ? 1 : 0);
 }
 
 void cmdPenDown(char *buf) {
@@ -86,16 +88,21 @@ void Robot::calibrate() {
 
 void Robot::stop() {
 //    setState(R_STOPPED);
-	cmdStop(msg);
+    cmdStop(msg, (penState == P_UP ? true : false));
 	sendMessage(msg);
 }
 
 void Robot::penUp() {
-    cmdPenUp(msg);
+    // todo: add delay before changing pen state
+    penState = P_UP;
+    cmdStop(msg, true);
+    sendMessage(msg);
 }
 
 void Robot::penDown() {
-    cmdPenDown(msg);
+    penState = P_DOWN;
+    cmdStop(msg, false);
+    sendMessage(msg);
 }
 
 void Robot::testRotate(float angle) {
@@ -167,45 +174,42 @@ void Robot::setState(RobotState newState) {
 	stateStartTime = ofGetElapsedTimef();
 }
 
-void Robot::stateMove(char *msg, bool &shouldSend) {
-    ofVec2f target = targetPos;
-
+void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend) {
 	ofVec2f dir = target - planePos;
 	float len = dir.length();
     
-    if (len < kTolerance) {
-        state = R_STOPPED;
-        inPosition = true;
-    } else {
-        inPosition = false;
-    }
-
 	dir.normalize();
 	float mag = ofMap(len, 0, 1, 150, 250, true);
 	float rad = atan2(dir.y, dir.x);
 	float angle = fmod(ofRadToDeg(rad) + 360, 360.0);
-
-	cmdMove(msg, angle, mag, rot);
-
-	shouldSend = ofGetFrameNum() % 4 == 0;
-
-	cout << "movement" << endl;
+    
+    if (drawing) {
+        cout << "DRAWING" << endl;
+        cmdDraw(msg, angle, mag, rot);
+    } else {
+        cout << "MOVING" << endl;
+        cmdMove(msg, angle, mag, rot);
+    }
+    
 	cout << planePos << endl;
 	cout << target << endl;
 	cout << msg << endl;
 }
 
-bool Robot::readyForPath() {
-    // TODO: make sure changing path mid moving doesn't mess up robot driving
-    if (state == R_STOPPED) {
-        return true;
-    }
-    return false;
+bool Robot::inPosition(ofVec2f target) {
+    ofVec2f dir = target - planePos;
+    float len = dir.length();
+    return (len < kTolerance ? true : false);
 }
 
-void Robot::startMove(ofVec2f goal) {
-    targetPos = goal;
-    state = R_MOVING;
+void Robot::setPathType(int pathType) {
+    navState.pathType = pathType;
+}
+
+void Robot::startNavigation(ofVec2f start, ofVec2f end) {
+    navState.start = start;
+    navState.end = end;
+    setState(R_POSITIONING);
 }
 
 void Robot::update() {
@@ -233,13 +237,13 @@ void Robot::update() {
 			setState(R_NO_CONN);
 		}
 
-		cmdStop(msg);
+		cmdStop(msg, false);
 		shouldSend = true;
 	} else if (state == R_NO_CONN) {
 		// Now connected and seen!
 		setState(R_START);
 
-		cmdStop(msg);
+		cmdStop(msg, false);
 		shouldSend = true;
 	} else if (state == R_START) {
 		// If we're started, immediately calibrate the angle
@@ -253,7 +257,7 @@ void Robot::update() {
         
 		if (elapsedStateTime >= kCalibrationWaitSec) {
 			// We've calibrated enough
-			setState(R_MOVING);
+//			setState(R_MOVING);
 		}
 	} else if (state == R_ROTATING_TO_ANGLE) {
 		// We're rotating to a target angle
@@ -278,15 +282,39 @@ void Robot::update() {
 			// We've waited long enough, stop.
 			setState(R_STOPPED);
 
-			cmdStop(msg);
+			cmdStop(msg, false);
 			shouldSend = true;
 		}
-    } else if (state == R_MOVING) {
+    } else if (state == R_POSITIONING) {
         // move in direction at magnitude
-		stateMove(msg, shouldSend);
-	} else if (state == R_STOPPED) {
+        if (inPosition(navState.start)) {
+            setState(R_WAITING_TO_DRAW);
+        } else {
+            // move is different from draw
+            moveRobot(msg, navState.start, false, shouldSend);
+            shouldSend = true;
+        }
+    } else if (state == R_WAITING_TO_DRAW) {
+        // wait for okay to draw
+        if (navState.drawReady) {
+            setState(R_DRAWING);
+            navState.drawReady = false;
+        }
+    } else if (state == R_DRAWING) {
+        if (inPosition(navState.end)) {
+            navState.readyForNextPath = true;
+            setState(R_DONE_DRAWING);
+        } else {
+            moveRobot(msg, navState.end, true, shouldSend);
+            shouldSend = true;
+        }
+    } else if (state == R_DONE_DRAWING) {
+        // we're stopped, pen is up
+        cmdStop(msg, true);
+        shouldSend = true;
+    } else if (state == R_STOPPED) {
 		// We're stopped. Stop.
-		cmdStop(msg);
+		cmdStop(msg, false);
 		shouldSend = true;
 	}
 

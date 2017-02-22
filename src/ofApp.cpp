@@ -3,6 +3,8 @@
 static const string currentFile = "test.svg";
 static const float kMarkerSize = 0.2032f;
 
+static const bool ROBOTS_DRAW = true;
+
 static const float MAP_W = 1.f;
 static const float MAP_H = 1.f;
 static const float OFFSET_X = -0.5f;
@@ -14,9 +16,8 @@ Map *currentMap;
 
 vector<MapPath> pathsDrawn;
 vector<vector<pathSegment>> robotPaths; // paths for reach robot, indexed by ID
-MapPath currentPath;
-bool movingToStart = true;
 bool getNextPath = false;
+
 
 //--------------------------------------------------------------
 void ofApp::setup(){
@@ -49,6 +50,7 @@ void ofApp::setup(){
 	robotsById[r01->id] = r01;
 	robotsByMarker[r01->markerId] = r01;
 	r01->setCommunication("192.168.1.70", 5111);
+    r01->setPathType(major_road);
 
 //	Robot *r02 = new Robot(2, 24, "Sarah");
 //	robotsById[r02->id] = r02;
@@ -83,10 +85,11 @@ void ofApp::setup(){
 //        gui->addButton("Move: " + ofToString(r.id));
         gui->addToggle("Pen Down: " + ofToString(r.id), false);
         gui->addButton("Drive Path: " + ofToString(r.id));
+        gui->addButton("Start Drawing: " + ofToString(r.id));
         gui->addBreak();
     }
     gui->addBreak();
-//    gui->addLabel(ofToString("Current Path Ð X: " + ofToString(currentPath.segment.start[0]) + " Y: " + ofToString(currentPath.segment.start[1])));
+    gui->addBreak();
     gui->addButton("Get Next Path");
     gui->addButton("Reload Map");
     
@@ -116,36 +119,33 @@ void ofApp::update(){
 }
 
 void ofApp::robotConductor() {
-    // have next path ready in queue
-    // wait to hear back from robots
-    // TODO: make this work for more than one robot
-    
-    
-    if(getNextPath) {
-        // checkNextPath pops front, so make sure to call it only when you want to get the next segment
-        if (currentMap->checkNextPath(major_road)) {
-            currentPath = currentMap->getNextPath();
-            pathsDrawn.push_back(currentPath);
-            cout << "path: " << currentPath.segment.start[0] << " " << currentPath.segment.start[1] << endl;
-            getNextPath = false;
+    // robot conductor responsibilities: control pen, send new directions, give the okay to start drawing
+    for (auto &p : robotsById) {
+        int id = p.first;
+        Robot &r = *p.second;
+        // todo refactor getNextPath to work for both robots
+        if(ROBOTS_DRAW && (r.state == R_STOPPED || r.state == R_DONE_DRAWING) && r.navState.readyForNextPath) {
+            r.navState.readyForNextPath = false;
+            // checkNextPath pops front, so make sure to call it only when you want to get the next segment
+            if (currentMap->checkNextPath(r.navState.pathType)) {
+                MapPath nextPath = currentMap->getNextPath();
+                pathsDrawn.push_back(nextPath);
+                cout << "path: " << nextPath.segment.start[0] << " " << nextPath.segment.start[1] << endl;
+                r.startNavigation(nextPath.segment.start, nextPath.segment.end);
+            } else {
+                r.stop();
+                cout << "No more paths to draw! (of type: " << ofToString(r.navState.pathType) << endl;
+            }
+        } else {
+            cout << "not drawing, r.state = " << r.state << endl;
+        }
+        // look at state machine
+        if (r.state == R_WAITING_TO_DRAW) {
+            // todo: calibrate
+            
         }
     }
-    
-//    for (auto &p : robotsById) {
-//        int id = p.first;
-//        Robot &r = *p.second;
-//        if (r.readyForPath()) {
-//            if (movingToStart) {
-//                r.startMove(currentPath.segment.start);
-//            } else {
-//                r.startMove(currentPath.segment.end);
-//                if (r.inPosition) {
-//                    // draw
-//                }
-//            }
-//        }
-//    }
-    
+    getNextPath = false;
     
 }
 
@@ -329,8 +329,6 @@ void ofApp::onToggleEvent(ofxDatGuiToggleEvent e)
         Robot &r = *it->second;
         if (e.target->is("messages enabled " + ofToString(r.id))) {
             r.enableMessages = e.checked;
-        } else if (e.target->is("get next path")) {
-            
         }
     }
 }
@@ -354,6 +352,8 @@ void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
         } else if (e.target->is("rotate: " + ofToString(r.id))) {
             cout << "ROTATING " << ofToString(r.id) << endl;
             r.testRotate(r.targetRot);
+        } else if (e.target->is("start drawing: " + ofToString(r.id))) {
+            r.navState.readyForNextPath = true;
         }
     }
     if (e.target->is("get next path")) {
