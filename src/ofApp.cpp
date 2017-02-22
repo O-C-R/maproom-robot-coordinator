@@ -135,19 +135,20 @@ void ofApp::robotConductor() {
             // todo: calibrate and do more things
             r.navState.drawReady = true;
         } else if (r.state == R_DRAWING) {
-            ofVec2f current = ofVec2f(r.planePos.x, r.planePos.y);
-            if (robotPaths.size()) {
-                if (robotPaths[r.id].size()) {
-                    ofVec2f last = robotPaths[r.id].back();
-                    ofVec2f diff = current - last;
-                    float len = diff.length();
-                    if (len > 0.001) {
-                        robotPaths[r.id].push_back(current);
-                    }
-                } else {
-                    robotPaths[r.id].push_back(current);
-                }
-            }
+//            ofVec2f current = ofVec2f(r.planePos.x, r.planePos.y);
+//            if (robotPaths.size()) {
+//                if (robotPaths[r.id].size()) {
+//                    ofVec2f last = robotPaths[r.id].back();
+//                    ofVec2f diff = current - last;
+//                    float len = diff.length();
+//                    if (len > 0.001) {
+//                        robotPaths[r.id].push_back(current);
+//                    }
+//                } else {
+//                    robotPaths[r.id].push_back(current);
+//                }
+//            }
+//            robotPaths[r.id].push_back(current);
         }
     }
     getNextPath = false;

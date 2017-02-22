@@ -8,7 +8,7 @@
 
 #include "Robot.h"
 
-static const float kTolerance = 0.05f;
+static const float kTolerance = 0.04f;
 
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
@@ -208,15 +208,16 @@ void Robot::update() {
 		return;
 	}
 
-	if (!commsUp()) {
-		if (state != R_NO_CONN) {
-			cout << "Comms down, moving to NO_CONN" << endl;
-			setState(R_NO_CONN);
-		}
-
-		cmdStop(msg, false);
-		shouldSend = true;
-	} else if (!cvDetected()) {
+//	if (!commsUp()) {
+//		if (state != R_NO_CONN) {
+//			cout << "Comms down, moving to NO_CONN" << endl;
+//			setState(R_NO_CONN);
+//		}
+//
+//		cmdStop(msg, false);
+//		shouldSend = true;
+//	} else
+    if (!cvDetected()) {
 		if (state != R_NO_CONN) {
 			cout << "CV down, moving to NO_CONN" << endl;
 			setState(R_NO_CONN);
@@ -274,7 +275,11 @@ void Robot::update() {
         cout << "STATE POSITIONING" << endl;
         // move in direction at magnitude
         if (inPosition(navState.start)) {
-            setState(R_WAITING_TO_DRAW);
+            cmdStop(msg, false);
+            shouldSend = true;
+            if (elapsedStateTime > 1.0f) {
+                setState(R_WAITING_TO_DRAW);
+            }
         } else {
             // move is different from draw
             moveRobot(msg, navState.start, false, shouldSend);
