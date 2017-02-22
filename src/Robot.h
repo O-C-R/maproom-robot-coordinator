@@ -89,7 +89,8 @@ public:
     
     // navigation
     ofVec2f targetPos;
-
+    bool getInitial;
+    
 	Robot(int rId, int mId, const string &n) :
 		id(rId),
 		markerId(mId),
@@ -102,7 +103,8 @@ public:
 		stateStartTime(0),
 		lastCameraUpdateTime(-1000),
 		lastHeartbeatTime(-1000),
-		positionIdx(0)
+		positionIdx(0),
+        getInitial(true)
 	{}
 
 	// Setup communication - must be called before sending any messages
@@ -129,8 +131,6 @@ public:
     // Set robot commands
     void calibrate();
     void stop();
-    void penUp();
-    void penDown();
     
     // nav states
     void setPathType(int pathType);

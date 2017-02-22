@@ -8,7 +8,7 @@
 
 #include "Robot.h"
 
-static const float kTolerance = 0.2f;
+static const float kTolerance = 0.02f;
 
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
@@ -55,14 +55,6 @@ void cmdStop(char *buf, bool penDown) {
     sprintf(buf, "MRSTP%+01d\n", penDown ? 1 : 0);
 }
 
-void cmdPenDown(char *buf) {
-    sprintf(buf, "MRPND\n");
-}
-
-void cmdPenUp(char *buf) {
-    sprintf(buf, "MRPNU\n");
-}
-
 void Robot::setCommunication(const string &rIp, int rPort) {
 	ip = rIp;
 	port = rPort;
@@ -90,19 +82,6 @@ void Robot::stop() {
 //    setState(R_STOPPED);
     cmdStop(msg, (penState == P_UP ? true : false));
 	sendMessage(msg);
-}
-
-void Robot::penUp() {
-    // todo: add delay before changing pen state
-    penState = P_UP;
-    cmdStop(msg, true);
-    sendMessage(msg);
-}
-
-void Robot::penDown() {
-    penState = P_DOWN;
-    cmdStop(msg, false);
-    sendMessage(msg);
 }
 
 void Robot::testRotate(float angle) {
@@ -161,6 +140,7 @@ void Robot::gotHeartbeat() {
 }
 
 bool Robot::commsUp() {
+    return true;
 	return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
 }
 
@@ -218,9 +198,9 @@ void Robot::update() {
 	float elapsedStateTime = ofGetElapsedTimef() - stateStartTime;
 	float rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
 
-	if (!enableMessages) {
-		return;
-	}
+//	if (!enableMessages) {
+//		return;
+//	}
 
 //	if (!commsUp()) {
 //		if (state != R_NO_CONN) {
@@ -247,7 +227,7 @@ void Robot::update() {
 		shouldSend = true;
 	} else if (state == R_START) {
 		// If we're started, immediately calibrate the angle
-
+        
 		setState(R_CALIBRATING_ANGLE);
 	} else if (state == R_CALIBRATING_ANGLE) {
 		// We're calibrating the angle for a bit
@@ -257,7 +237,7 @@ void Robot::update() {
         
 		if (elapsedStateTime >= kCalibrationWaitSec) {
 			// We've calibrated enough
-//			setState(R_MOVING);
+			setState(R_POSITIONING);
 		}
 	} else if (state == R_ROTATING_TO_ANGLE) {
 		// We're rotating to a target angle
@@ -286,6 +266,7 @@ void Robot::update() {
 			shouldSend = true;
 		}
     } else if (state == R_POSITIONING) {
+        cout << "STATE POSITIONING" << endl;
         // move in direction at magnitude
         if (inPosition(navState.start)) {
             setState(R_WAITING_TO_DRAW);
@@ -295,12 +276,14 @@ void Robot::update() {
             shouldSend = true;
         }
     } else if (state == R_WAITING_TO_DRAW) {
+        cout << "WAITING TO DRAW" << endl;
         // wait for okay to draw
         if (navState.drawReady) {
             setState(R_DRAWING);
             navState.drawReady = false;
         }
     } else if (state == R_DRAWING) {
+        cout << "DRAWING" << endl;
         if (inPosition(navState.end)) {
             navState.readyForNextPath = true;
             setState(R_DONE_DRAWING);
@@ -309,16 +292,18 @@ void Robot::update() {
             shouldSend = true;
         }
     } else if (state == R_DONE_DRAWING) {
+        cout << "DONE DRAWING" << endl;
         // we're stopped, pen is up
         cmdStop(msg, true);
         shouldSend = true;
     } else if (state == R_STOPPED) {
+        cout << "STOPPED" << endl;
 		// We're stopped. Stop.
 		cmdStop(msg, false);
 		shouldSend = true;
 	}
 
 	if (shouldSend && enableMessages) {
-		sendMessage(msg);
+//		sendMessage(msg);
 	}
 }

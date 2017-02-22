@@ -83,7 +83,7 @@ void ofApp::setup(){
 //        gui->addSlider("Move Dir: " + ofToString(r.id), 0, 360, startingDir);
 //        gui->addSlider("Move Mag: " + ofToString(r.id), 0, 600, startingMag);
 //        gui->addButton("Move: " + ofToString(r.id));
-        gui->addToggle("Pen Down: " + ofToString(r.id), false);
+//        gui->addToggle("Pen Down: " + ofToString(r.id), false);
         gui->addButton("Drive Path: " + ofToString(r.id));
         gui->addButton("Start Drawing: " + ofToString(r.id));
         gui->addBreak();
@@ -124,7 +124,8 @@ void ofApp::robotConductor() {
         int id = p.first;
         Robot &r = *p.second;
         // todo refactor getNextPath to work for both robots
-        if(ROBOTS_DRAW && (r.state == R_STOPPED || r.state == R_DONE_DRAWING) && r.navState.readyForNextPath) {
+        if(r.getInitial || (ROBOTS_DRAW && (r.state == R_STOPPED || r.state == R_DONE_DRAWING) && r.navState.readyForNextPath)) {
+            r.getInitial = false;
             r.navState.readyForNextPath = false;
             // checkNextPath pops front, so make sure to call it only when you want to get the next segment
             if (currentMap->checkNextPath(r.navState.pathType)) {
@@ -136,13 +137,11 @@ void ofApp::robotConductor() {
                 r.stop();
                 cout << "No more paths to draw! (of type: " << ofToString(r.navState.pathType) << endl;
             }
-        } else {
-            cout << "not drawing, r.state = " << r.state << endl;
         }
         // look at state machine
         if (r.state == R_WAITING_TO_DRAW) {
-            // todo: calibrate
-            
+            // todo: calibrate and do more things
+            r.navState.drawReady = true;
         }
     }
     getNextPath = false;
