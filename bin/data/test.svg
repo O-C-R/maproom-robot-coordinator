@@ -7,6 +7,7 @@
             <path d="M100.0,100.0L50.0,150" fill="none" stroke="black" stroke-width="3px"></path>
             <path d="M100.0,100.0L150.0,50" fill="none" stroke="black" stroke-width="3px"></path>
             <path d="M100.0,100.0L150.0,150.0" fill="none" stroke="black" stroke-width="3px"></path>
+            <!-- <path d="M50,100L50,50L100,100L100,50L150,50L100,100L150,100L150,150L100,100L100,150L50,150L100,100L50,100" fill="none" stroke="black" stroke-width="3px"></path> -->
         </g>
     </g>
 </svg>

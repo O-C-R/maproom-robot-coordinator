@@ -8,7 +8,7 @@
 
 #include "Robot.h"
 
-static const float kTolerance = 0.04f;
+static const float kTolerance = 0.02f;
 
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
@@ -126,9 +126,14 @@ void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const o
 	worldPos = mat.getTranslation();
 
 	// Translate to the center of the marker
-	planePos.set(worldPos.x, worldPos.y);
-//	planePos += ofVec2f(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0);
-
+    
+    planePos.set(worldPos.x, worldPos.y);
+    
+    // offset center of the robot   
+//    ofVec3f center = ofVec3f(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0)*mat;
+//    planePos.set(center.x, center.y);
+    
+    
 	// Get z-axis rotation
 	ofVec3f xAxis = ofVec3f(1.0, 0.0, 0.0) * mat;
 	ofVec2f xAxisVec = ofVec2f(xAxis.x, xAxis.y) - ofVec2f(worldPos.x, worldPos.y);

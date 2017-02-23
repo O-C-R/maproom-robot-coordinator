@@ -7,8 +7,8 @@ static const bool ROBOTS_DRAW = true;
 
 static const float MAP_W = 1.f;
 static const float MAP_H = 1.f;
-static const float OFFSET_X = -0.5f;
-static const float OFFSET_Y = -0.5f;
+static const float OFFSET_X = -.5f;
+static const float OFFSET_Y = -0.2f;
 
 char udpMessage[1024];
 
@@ -246,12 +246,20 @@ void ofApp::draw(){
 		ofPopMatrix();
 	}
 
-	ofVec3f corner1(0.0),
-		corner2(kMarkerSizeM, kMarkerSizeM, 0.0),
-		corner3(kMarkerSizeM, 0.0, 0.0),
-		corner4(0.0, kMarkerSizeM, 0.0),
-		center(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0),
-		up(0.0, 0.0, kMarkerSizeM);
+//	ofVec3f corner1(0.0),
+//		corner2(kMarkerSizeM, kMarkerSizeM, 0.0),
+//		corner3(kMarkerSizeM, 0.0, 0.0),
+//		corner4(0.0, kMarkerSizeM, 0.0),
+//		center(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0),
+//		up(0.0, 0.0, kMarkerSizeM);
+    
+    // offset projection 
+    ofVec3f corner1(-kMarkerSizeM/2.0, -kMarkerSizeM/2.0),
+    corner2(kMarkerSizeM/2.0, kMarkerSizeM/2.0, 0.0),
+    corner3(kMarkerSizeM/2.0, -kMarkerSizeM/2.0, 0.0),
+    corner4(-kMarkerSizeM/2.0, kMarkerSizeM/2.0, 0.0),
+    center(0.0, 0.0, 0.0),
+    up(0.0, 0.0, kMarkerSizeM);
      
     char buf[1024];
     
@@ -339,6 +347,8 @@ void ofApp::draw(){
 		ofDrawLine(c2, c4);
 		ofSetColor(0, 255, 255);
 		ofDrawLine(c1, u);
+        
+        
 
 		ofSetColor(255, 255, 255);
 		ofDrawSphere(cen, kMarkerSizeM / 4.0);
@@ -346,6 +356,12 @@ void ofApp::draw(){
         
 		ofPopStyle();
 		ofPopMatrix();
+        
+        ofPushStyle();
+        ofSetColor(255,0,255);
+        ofNoFill();
+        ofDrawCircle(r.planePos.x, r.planePos.y, 0.03);
+        ofPopStyle();
 	}
 	cam.end();
     

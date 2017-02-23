@@ -33,7 +33,7 @@ void Map::storePath(string type, float startX, float startY, float destX, float 
     
     pathSegment segment;
     segment.start = ofVec2f(scaleX*startX + offsetX, scaleY*startY + offsetY);
-    segment.end = ofVec2f(scaleY*destX + offsetY, scaleY*destY + offsetY);
+    segment.end = ofVec2f(scaleY*destX + offsetX, scaleY*destY + offsetY);
     mapPathStore[lineType].push_back(segment);
 }
 
@@ -41,7 +41,6 @@ void Map::clearStore() {
     for (int i=FIRST; i < LAST; i++) {
         mapPathStore[i].clear();
     }
-    
 }
 
 void Map::loadMap(const string filename) {
