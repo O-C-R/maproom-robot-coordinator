@@ -7,8 +7,8 @@ static const bool ROBOTS_DRAW = true;
 
 static const float MAP_W = 1.f;
 static const float MAP_H = 1.f;
-static const float OFFSET_X = -.5f;
-static const float OFFSET_Y = -0.2f;
+static const float OFFSET_X = -0.8f;
+static const float OFFSET_Y = -0.8f;
 
 char udpMessage[1024];
 
@@ -78,8 +78,8 @@ void ofApp::setup(){
         gui->addToggle("Messages Enabled " + ofToString(r.id), false);
         gui->addButton("Stop: " + ofToString(r.id));
         gui->addButton("Start: " + ofToString(r.id));
-//        gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, startingAngle);
-//        gui->addButton("Rotate: " + ofToString(r.id));
+        gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, startingAngle);
+        gui->addButton("Rotate: " + ofToString(r.id));
         gui->addButton("Start Drawing: " + ofToString(r.id));
         gui->addBreak();
     }
@@ -253,7 +253,7 @@ void ofApp::draw(){
 //		center(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0),
 //		up(0.0, 0.0, kMarkerSizeM);
     
-    // offset projection 
+    // offset projection
     ofVec3f corner1(-kMarkerSizeM/2.0, -kMarkerSizeM/2.0),
     corner2(kMarkerSizeM/2.0, kMarkerSizeM/2.0, 0.0),
     corner3(kMarkerSizeM/2.0, -kMarkerSizeM/2.0, 0.0),

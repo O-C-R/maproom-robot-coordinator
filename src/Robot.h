@@ -22,6 +22,9 @@ typedef enum RobotState {
 	R_ROTATING_TO_ANGLE,
 	R_WAITING_ANGLE,
 	R_POSITIONING,
+    R_WAITING_TO_ROTATE,
+    R_WAITING_DRAW_ANGLE,
+    R_ROTATING_TO_DRAW,
     R_WAITING_TO_DRAW,
 	R_DRAWING,
     R_DONE_DRAWING,
@@ -123,6 +126,7 @@ public:
 	// States
 	void moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend);
     bool inPosition(ofVec2f target);
+    void rotateToDraw(char *msg, ofVec2f target, bool &shouldSend);
 
 	// Query robot state
 	bool commsUp();

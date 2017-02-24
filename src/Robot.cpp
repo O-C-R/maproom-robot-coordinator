@@ -8,7 +8,7 @@
 
 #include "Robot.h"
 
-static const float kTolerance = 0.02f;
+static const float kTolerance = 0.01f;
 
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 0.5f;
@@ -86,14 +86,13 @@ void Robot::stop() {
 
 void Robot::start() {
     setState(R_START);
-    
 }
 
 void Robot::testRotate(float angle) {
     targetRot = angle;
+    setState(R_ROTATING_TO_ANGLE);
 	cmdRot(msg, angle, rot);
 	sendMessage(msg);
-//    setState(R_ROTATING_TO_ANGLE);
 }
 
 void Robot::testMove(float direction, float magnitude) {
@@ -129,18 +128,18 @@ void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const o
     
     planePos.set(worldPos.x, worldPos.y);
     
-    // offset center of the robot   
+    // offset center of the robot
 //    ofVec3f center = ofVec3f(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0)*mat;
 //    planePos.set(center.x, center.y);
     
     
 	// Get z-axis rotation
-	ofVec3f xAxis = ofVec3f(1.0, 0.0, 0.0) * mat;
-	ofVec2f xAxisVec = ofVec2f(xAxis.x, xAxis.y) - ofVec2f(worldPos.x, worldPos.y);
-	float xAxisAngle = atan2(xAxisVec.y, xAxisVec.x);
+	ofVec3f angAxis = ofVec3f(0.0, 1.0, 0.0) * mat;
+	ofVec2f axisVec = ofVec2f(angAxis.x, angAxis.y) - ofVec2f(worldPos.x, worldPos.y);
+	float axisAngle = atan2(axisVec.y, axisVec.x);
 
 	// rotation is right-handed, and goes from 0-360 starting on the +x axis
-	rot = fmod(ofRadToDeg(xAxisAngle) + 360, 360.0);
+	rot = fmod(ofRadToDeg(axisAngle) + 360 - 90, 360.0);
 
 	lastCameraUpdateTime = ofGetElapsedTimef();
 }
@@ -164,6 +163,26 @@ void Robot::setState(RobotState newState) {
 	stateStartTime = ofGetElapsedTimef();
 }
 
+void Robot::rotateToDraw(char *msg, ofVec2f target, bool &shouldSend) {
+    ofVec2f dir = navState.end - navState.start;
+//    dir.normalize();
+    float rad = atan2(dir.y, dir.x);
+    float heading = fmod(ofRadToDeg(rad) + 360, 360.0);
+    
+    // given heading, where do we rotate?
+//    float idealOffset = fmod(heading - rot, 120.0);
+//    float newAngle;
+//    if (heading > rot) {
+//        newAngle = fmod(rot - idealOffset, 360.0);
+//    } else {
+//        newAngle = fmod(rot + idealOffset, 360.0);
+//    }
+//    cout << "new angle: " << newAngle << endl;
+    targetRot = heading;
+    cout << "targetRot: " << targetRot << endl;
+    shouldSend = true;
+}
+
 void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend) {
 	ofVec2f dir = target - planePos;
 	float len = dir.length();
@@ -171,7 +190,7 @@ void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend)
 	dir.normalize();
 	float mag = ofMap(len, 0, 1, 150, 250, true);
 	float rad = atan2(dir.y, dir.x);
-	float angle = fmod(ofRadToDeg(rad) + 360, 360.0);
+	float angle = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
     
     if (drawing) {
         cout << "DRAWING" << endl;
@@ -248,9 +267,9 @@ void Robot::update() {
         
 		if (elapsedStateTime >= kCalibrationWaitSec) {
 			// We've calibrated enough
-			setState(R_POSITIONING);
+            setState(R_POSITIONING);
 		}
-	} else if (state == R_ROTATING_TO_ANGLE) {
+    } else if (state == R_ROTATING_TO_ANGLE) {
 		// We're rotating to a target angle
 
 		if (abs(rotAngleDiff) > kRotationToleranceFinal) {
@@ -282,19 +301,47 @@ void Robot::update() {
         if (inPosition(navState.start)) {
             cmdStop(msg, false);
             shouldSend = true;
-            if (elapsedStateTime > 1.0f) {
-                setState(R_WAITING_TO_DRAW);
-            }
+            setState(R_WAITING_TO_ROTATE);
         } else {
             // move is different from draw
             moveRobot(msg, navState.start, false, shouldSend);
         }
+    } else if (state == R_WAITING_TO_ROTATE) {
+        cout << "WAITING TO ROTATE" << endl;
+        cmdStop(msg, false);
+        shouldSend = true;
+        if (elapsedStateTime > 1.0f) {
+            setState(R_ROTATING_TO_DRAW);
+        }
+    } else if (state == R_ROTATING_TO_DRAW) {
+        cout << "ROTATING TO IDEAL ANGLE" << endl;
+        ofVec2f dir = navState.end - navState.start;
+        float rad = atan2(dir.y, dir.x);
+        float heading = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
+        targetRot = heading;
+        cout << "targetRot: " << targetRot << endl;
+        cmdRot(msg, targetRot, rot);
+        shouldSend = true;
+        rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
+        if (abs(rotAngleDiff) < 2.0) {
+            cmdStop(msg, false);
+            shouldSend = true;
+            setState(R_WAITING_DRAW_ANGLE);
+        }
+    }  else if (state == R_WAITING_DRAW_ANGLE) {
+        cmdStop(msg, false);
+        shouldSend = true;
+        if (elapsedStateTime > 1.0f) {
+            setState(R_WAITING_TO_DRAW);
+        }
     } else if (state == R_WAITING_TO_DRAW) {
-        cout << "WAITING TO DRAW" << endl;
+        cout << "WAITING FOR DRAW ANGLE" << endl;
         // wait for okay to draw
         if (navState.drawReady) {
-            setState(R_DRAWING);
-            navState.drawReady = false;
+            if (elapsedStateTime > 1.0f) {
+                setState(R_DRAWING);
+                navState.drawReady = false;
+            }
         }
     } else if (state == R_DRAWING) {
         cout << "DRAWING" << endl;
