@@ -12,27 +12,16 @@
 #include "ofxXmlSettings.h"
 #include "ofMain.h"
 
-enum roadTypes {
-	FIRST,
-    major_road,
-	minor_road,
-    highway,
-    aerialway,
-    rail,
-    path,
-    ferry,
-    etc,
-    LAST
-};
-
-typedef struct MapPathSegment {
+typedef struct pathSegment {
 	ofVec2f start, end;
 } pathSegment;
 
 typedef struct MapPath {
-	int id;
+    bool drawn;
+    string type;
 	pathSegment segment;
 } MapPath;
+
 
 class Map {
 public:
@@ -40,13 +29,15 @@ public:
 	void loadMap(const string filename);
     
 	bool checkNextPath();
-    bool checkNextPath(int pathType);
+    bool checkNextPath(ofVec2f initial);
+    bool checkNextPath(ofVec2f initial, string pathType);
     
 	MapPath getNextPath();
     
     ofxXmlSettings currentMap;
     
-    map<int, list<pathSegment>> mapPathStore;
+    map<string, list<MapPath>> mapPathStore;
+    vector<string> pathTypes;
     
     void storePath(string type, float startX, float startY, float destX, float destY);
     void clearStore();

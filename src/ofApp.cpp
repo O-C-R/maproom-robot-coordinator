@@ -1,6 +1,6 @@
 #include "ofApp.h"
 
-static const string currentFile = "test.svg";
+static const string currentFile = "test_case.svg";
 static const float kMarkerSize = 0.2032f;
 
 static const bool ROBOTS_DRAW = true;
@@ -8,7 +8,7 @@ static const bool ROBOTS_DRAW = true;
 static const float MAP_W = 1.f;
 static const float MAP_H = 1.f;
 static const float OFFSET_X = -0.8f;
-static const float OFFSET_Y = -0.8f;
+static const float OFFSET_Y = -0.2f;
 
 char udpMessage[1024];
 
@@ -46,11 +46,10 @@ void ofApp::setup(){
 
 	cameraToWorldInv = cameraToWorld.getInverse();
 
-	Robot *r01 = new Robot(1, 23, "Delmar");
+	Robot *r01 = new Robot(2, 24, "Delmar");
 	robotsById[r01->id] = r01;
 	robotsByMarker[r01->markerId] = r01;
 	r01->setCommunication("192.168.1.70", 5111);
-    r01->setPathType(major_road);
 
 //	Robot *r02 = new Robot(2, 24, "Sarah");
 //	robotsById[r02->id] = r02;
@@ -78,6 +77,8 @@ void ofApp::setup(){
         gui->addToggle("Messages Enabled " + ofToString(r.id), false);
         gui->addButton("Stop: " + ofToString(r.id));
         gui->addButton("Start: " + ofToString(r.id));
+        gui->addButton("Calibrate: " + ofToString(r.id));
+        gui->addButton("Next Path: " + ofToString(r.id));
         gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, startingAngle);
         gui->addButton("Rotate: " + ofToString(r.id));
         gui->addButton("Start Drawing: " + ofToString(r.id));
@@ -99,7 +100,7 @@ void ofApp::setup(){
 	robotReceiver.SetNonBlocking(true);
     
     currentMap = new Map(MAP_W, MAP_H, OFFSET_X, OFFSET_Y);
-    loadMap("test.svg");
+    loadMap(currentFile);
 }
 
 //--------------------------------------------------------------
@@ -119,11 +120,11 @@ void ofApp::robotConductor() {
         if(r.getInitial || (ROBOTS_DRAW && (r.state == R_STOPPED || r.state == R_DONE_DRAWING) && r.navState.readyForNextPath)) {
             r.getInitial = false;
             r.navState.readyForNextPath = false;
-            // checkNextPath pops front, so make sure to call it only when you want to get the next segment
-            if (currentMap->checkNextPath(r.navState.pathType)) {
+            if (currentMap->checkNextPath(r.planePos)) {
                 MapPath nextPath = currentMap->getNextPath();
                 pathsDrawn.push_back(nextPath);
                 cout << "path: " << nextPath.segment.start[0] << " " << nextPath.segment.start[1] << endl;
+                cout << "to: " << nextPath.segment.end[0] << " " << nextPath.segment.end[1] << endl;
                 r.startNavigation(nextPath.segment.start, nextPath.segment.end);
             } else {
                 r.stop();
@@ -154,7 +155,6 @@ void ofApp::robotConductor() {
     getNextPath = false;
     
 }
-
 
 void ofApp::receiveFromRobots() {
 	int nChars = robotReceiver.Receive(robotMessage, 1024);
@@ -241,17 +241,11 @@ void ofApp::draw(){
 		ofPushStyle();
 		ofVec3f pos = ofVec3f(0.0) * cameraToWorld;
 		ofSetColor(255, 255, 255);
+        ofNoFill();
 		ofDrawIcoSphere(pos, 0.02);
 		ofPopStyle();
 		ofPopMatrix();
 	}
-
-//	ofVec3f corner1(0.0),
-//		corner2(kMarkerSizeM, kMarkerSizeM, 0.0),
-//		corner3(kMarkerSizeM, 0.0, 0.0),
-//		corner4(0.0, kMarkerSizeM, 0.0),
-//		center(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0),
-//		up(0.0, 0.0, kMarkerSizeM);
     
     // offset projection
     ofVec3f corner1(-kMarkerSizeM/2.0, -kMarkerSizeM/2.0),
@@ -263,10 +257,18 @@ void ofApp::draw(){
      
     char buf[1024];
     
-    // draw paths
+
+    ofPushStyle();
     
     // draw all paths
-    ofPushStyle();
+    ofSetColor(90, 90, 90);
+    for (auto &i : currentMap->mapPathStore) {
+        for (auto &j : i.second) {
+            ofDrawLine(j.segment.start, j.segment.end);
+        }
+    }
+    
+    // draw current paths / paths drawn
     ofSetColor(95, 255, 255);
     for (int path = 0; path < pathsDrawn.size(); path++) {
         ofVec3f lineStart = ofVec3f(pathsDrawn[path].segment.start[0], pathsDrawn[path].segment.start[1], 0);
@@ -379,7 +381,6 @@ void ofApp::loadMap(string mapName) {
         Robot &r = *p.second;
         r.getInitial = true;
     }
-
 }
 
 void ofApp::onToggleEvent(ofxDatGuiToggleEvent e)
@@ -416,11 +417,19 @@ void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
             r.navState.readyForNextPath = true;
         } else if (e.target->is("start: " + ofToString(r.id))) {
             r.start();
+        } else if (e.target->is("next path: " + ofToString(r.id))) {
+            if (currentMap->checkNextPath(r.navState.end)) {
+                MapPath nextPath = currentMap->getNextPath();
+                cout << "path: " << nextPath.segment.start[0] << " " << nextPath.segment.start[1] << endl;
+                cout << "to: " << nextPath.segment.end[0] << " " << nextPath.segment.end[1] << endl;
+                pathsDrawn.push_back(nextPath);
+                r.startNavigation(nextPath.segment.start, nextPath.segment.end);
+            } else {
+                cout << "no more paths" << endl;
+            }
         }
     }
-    if (e.target->is("get next path")) {
-        getNextPath = true;
-    } else if (e.target->is("reload map")) {
+    if (e.target->is("reload map")) {
         cout << "RELOADING MAP " << endl;
         loadMap(currentFile);
     }

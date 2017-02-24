@@ -21,7 +21,7 @@ static const float kAngleWaitSec = 2.0f;
 static const float kMoveWaitSec = 2.0f;
 
 static const float kRotationToleranceStart = 10.0f;
-static const float kRotationToleranceFinal = 3.0f;
+static const float kRotationToleranceFinal = 1.5f;
 
 const static float kSqSizeM = 0.25;
 const static int kNumPositions = 5;
@@ -188,7 +188,7 @@ void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend)
 	float len = dir.length();
     
 	dir.normalize();
-	float mag = ofMap(len, 0, 1, 150, 250, true);
+	float mag = ofMap(len, 0, 1, 170, 330, true);
 	float rad = atan2(dir.y, dir.x);
 	float angle = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
     
@@ -323,16 +323,22 @@ void Robot::update() {
         cmdRot(msg, targetRot, rot);
         shouldSend = true;
         rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
-        if (abs(rotAngleDiff) < 2.0) {
-            cmdStop(msg, false);
-            shouldSend = true;
+        if (abs(rotAngleDiff) < kRotationToleranceStart) {
+//            cmdStop(msg, false);
+//            shouldSend = true;
             setState(R_WAITING_DRAW_ANGLE);
         }
     }  else if (state == R_WAITING_DRAW_ANGLE) {
-        cmdStop(msg, false);
-        shouldSend = true;
-        if (elapsedStateTime > 1.0f) {
-            setState(R_WAITING_TO_DRAW);
+//        cmdStop(msg, false);
+//        shouldSend = true;
+        if (elapsedStateTime > 2.0f) {
+            rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
+            if (rotAngleDiff < kRotationToleranceFinal) {
+                setState(R_WAITING_TO_DRAW);
+            } else {
+                setState(R_ROTATING_TO_DRAW);
+            }
+            
         }
     } else if (state == R_WAITING_TO_DRAW) {
         cout << "WAITING FOR DRAW ANGLE" << endl;
