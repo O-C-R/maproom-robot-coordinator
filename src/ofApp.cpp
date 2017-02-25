@@ -5,10 +5,10 @@ static const float kMarkerSize = 0.2032f;
 
 static const bool ROBOTS_DRAW = true;
 
-static const float MAP_W = 1.f;
-static const float MAP_H = 1.f;
-static const float OFFSET_X = -0.8f;
-static const float OFFSET_Y = -0.2f;
+static const float MAP_W = 2.0f;
+static const float MAP_H = 2.0f;
+static const float OFFSET_X = -1.2f;
+static const float OFFSET_Y = -0.5f;
 
 char udpMessage[1024];
 

@@ -23,8 +23,8 @@ typedef enum RobotState {
 	R_WAITING_ANGLE,
 	R_POSITIONING,
     R_WAITING_TO_ROTATE,
-    R_WAITING_DRAW_ANGLE,
     R_ROTATING_TO_DRAW,
+    R_WAITING_DRAW_ANGLE,
     R_WAITING_TO_DRAW,
 	R_DRAWING,
     R_DONE_DRAWING,
@@ -140,6 +140,7 @@ public:
     // nav states
     void setPathType(int pathType);
     void startNavigation(ofVec2f start, ofVec2f end);
+    bool setRotating;
     
     // test commands
     void testRotate(float angle);

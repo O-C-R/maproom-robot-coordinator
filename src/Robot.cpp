@@ -21,7 +21,7 @@ static const float kAngleWaitSec = 2.0f;
 static const float kMoveWaitSec = 2.0f;
 
 static const float kRotationToleranceStart = 10.0f;
-static const float kRotationToleranceFinal = 1.5f;
+static const float kRotationToleranceFinal = 3.0f;
 
 const static float kSqSizeM = 0.25;
 const static int kNumPositions = 5;
@@ -188,7 +188,7 @@ void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend)
 	float len = dir.length();
     
 	dir.normalize();
-	float mag = ofMap(len, 0, 1, 170, 330, true);
+	float mag = ofMap(len, 0, 1, 65, 250, true);
 	float rad = atan2(dir.y, dir.x);
 	float angle = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
     
@@ -311,37 +311,52 @@ void Robot::update() {
         cmdStop(msg, false);
         shouldSend = true;
         if (elapsedStateTime > 1.0f) {
-            setState(R_ROTATING_TO_DRAW);
+//            setState(R_ROTATING_TO_DRAW);
+            setState(R_WAITING_TO_DRAW);
+        } else if (!inPosition(navState.start)) {
+            setState(R_POSITIONING);
         }
     } else if (state == R_ROTATING_TO_DRAW) {
         cout << "ROTATING TO IDEAL ANGLE" << endl;
         ofVec2f dir = navState.end - navState.start;
         float rad = atan2(dir.y, dir.x);
-        float heading = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
+        float heading = fmod(ofRadToDeg(rad) + 360 + 90, 360.0);
         targetRot = heading;
         cout << "targetRot: " << targetRot << endl;
         cmdRot(msg, targetRot, rot);
         shouldSend = true;
-        rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
+        rotAngleDiff = abs(fmod(ofAngleDifferenceDegrees(targetRot, rot), 360.0));
+        cout << "rotAngleDiff: " << rotAngleDiff << endl;
         if (abs(rotAngleDiff) < kRotationToleranceStart) {
 //            cmdStop(msg, false);
 //            shouldSend = true;
+            setRotating = false;
             setState(R_WAITING_DRAW_ANGLE);
         }
     }  else if (state == R_WAITING_DRAW_ANGLE) {
-//        cmdStop(msg, false);
-//        shouldSend = true;
+        if (!setRotating) {
+            cmdRot(msg, targetRot, rot);
+            shouldSend = true;
+            setRotating = true;
+        }
+        cout << "WAITING FOR DRAW ANGLE" << endl;
+        rotAngleDiff = abs(fmod(ofAngleDifferenceDegrees(targetRot, rot), 360.0));
         if (elapsedStateTime > 2.0f) {
-            rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
-            if (rotAngleDiff < kRotationToleranceFinal) {
+            if (abs(rotAngleDiff) < kRotationToleranceFinal) {
+                cmdStop(msg, false);
+                shouldSend = true;
                 setState(R_WAITING_TO_DRAW);
             } else {
-                setState(R_ROTATING_TO_DRAW);
+                calibrate();
+                if (elapsedStateTime > 2.25f) {
+                    setState(R_ROTATING_TO_DRAW);
+                }
             }
-            
+        } else if (abs(rotAngleDiff) > kRotationToleranceStart) {
+            setState(R_ROTATING_TO_DRAW);
         }
     } else if (state == R_WAITING_TO_DRAW) {
-        cout << "WAITING FOR DRAW ANGLE" << endl;
+        cout << "WAITING TO DRAW" << endl;
         // wait for okay to draw
         if (navState.drawReady) {
             if (elapsedStateTime > 1.0f) {
