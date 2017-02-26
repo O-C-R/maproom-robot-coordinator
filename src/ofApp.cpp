@@ -1,14 +1,14 @@
 #include "ofApp.h"
 
-static const string currentFile = "test_case.svg";
+static const string currentFile = "maproom-2017-02-26T04-23-37.025Z.svg";
 static const float kMarkerSize = 0.2032f;
 
 static const bool ROBOTS_DRAW = true;
 
-static const float MAP_W = 2.0f;
-static const float MAP_H = 2.0f;
-static const float OFFSET_X = -1.0f;
-static const float OFFSET_Y = -0.5f;
+static const float MAP_W = 1.3f;
+static const float MAP_H = 1.3f;
+static const float OFFSET_X = 1.0f;
+static const float OFFSET_Y = 0.7f;
 
 char udpMessage[1024];
 
@@ -121,11 +121,7 @@ void ofApp::robotConductor() {
             r.getInitial = false;
             r.navState.readyForNextPath = false;
             if (currentMap->checkNextPath(r.planePos)) {
-                MapPath nextPath = currentMap->getNextPath();
-                pathsDrawn.push_back(nextPath);
-                cout << "path: " << nextPath.segment.start[0] << " " << nextPath.segment.start[1] << endl;
-                cout << "to: " << nextPath.segment.end[0] << " " << nextPath.segment.end[1] << endl;
-                r.startNavigation(nextPath.segment.start, nextPath.segment.end);
+            
             } else {
                 r.stop();
                 cout << "No more paths to draw! (of type: " << ofToString(r.navState.pathType) << endl;
@@ -227,6 +223,22 @@ void ofApp::commandRobots() {
 	free(buf);
 }
 
+void ofApp::loadNextPath(Robot* r) {
+    MapPath nextPath = currentMap->getNextPath();
+    float lenToStart = (nextPath.segment.start - r->navState.end).length();
+    float lenToEnd = (nextPath.segment.end - r->navState.end).length();
+    if (lenToStart < lenToEnd) {
+        pathsDrawn.push_back(nextPath);
+    } else {
+        ofVec2f tmp = nextPath.segment.start;
+        nextPath.segment.start = nextPath.segment.end;
+        nextPath.segment.end = tmp;
+        pathsDrawn.push_back(nextPath);
+    }
+    r->startNavigation(nextPath.segment.start, nextPath.segment.end);
+
+}
+
 //--------------------------------------------------------------
 void ofApp::draw(){
 	stringstream posstr;
@@ -261,9 +273,13 @@ void ofApp::draw(){
     ofPushStyle();
     
     // draw all paths
-    ofSetColor(90, 90, 90);
     for (auto &i : currentMap->mapPathStore) {
         for (auto &j : i.second) {
+            ofSetColor(0, 90, 0);
+            ofDrawCircle(j.segment.start, 0.006);
+            ofSetColor(90, 0, 0);
+            ofDrawCircle(j.segment.end, 0.006);
+            ofSetColor(90, 90, 90);
             ofDrawLine(j.segment.start, j.segment.end);
         }
     }
@@ -379,8 +395,10 @@ void ofApp::draw(){
 		ofPopMatrix();
         
         ofPushStyle();
-        ofSetColor(255,0,255);
         ofNoFill();
+        ofSetColor(0,255,255);
+        ofDrawCircle(r.avgPlanePos.x, r.avgPlanePos.y, 0.03);
+        ofSetColor(255,0,255);
         ofDrawCircle(r.planePos.x, r.planePos.y, 0.03);
         ofPopStyle();
 	}
@@ -437,12 +455,8 @@ void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
         } else if (e.target->is("start: " + ofToString(r.id))) {
             r.start();
         } else if (e.target->is("next path: " + ofToString(r.id))) {
-            if (currentMap->checkNextPath(r.navState.end)) {
-                MapPath nextPath = currentMap->getNextPath();
-                cout << "path: " << nextPath.segment.start[0] << " " << nextPath.segment.start[1] << endl;
-                cout << "to: " << nextPath.segment.end[0] << " " << nextPath.segment.end[1] << endl;
-                pathsDrawn.push_back(nextPath);
-                r.startNavigation(nextPath.segment.start, nextPath.segment.end);
+            if(currentMap->checkNextPath(r.navState.end)) {
+                loadNextPath(&r);
             } else {
                 cout << "no more paths" << endl;
             }

@@ -43,6 +43,7 @@ class ofApp : public ofBaseApp{
     void robotConductor();
     
     void loadMap(string name);
+    void loadNextPath(Robot* r);
 
 private:
 	ofEasyCam cam;

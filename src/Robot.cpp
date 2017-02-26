@@ -15,7 +15,7 @@ static const float kCameraTimeoutSec = 1.0f;
 
 static const float kPenMovementTime = 0.1f;
 
-static const float kCalibrationWaitSec = 1.0f;
+static const float kCalibrationWaitSec = 0.25f;
 static const float kAngleWaitSec = 2.0f;
 
 static const float kMoveWaitSec = 2.0f;
@@ -254,7 +254,7 @@ void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend)
 }
 
 bool Robot::inPosition(ofVec2f target) {
-    ofVec2f dir = target - planePos;
+    ofVec2f dir = target - avgPlanePos;
     float len = dir.length();
     return (len < kTolerance ? true : false);
 }
@@ -266,6 +266,7 @@ void Robot::setPathType(int pathType) {
 void Robot::startNavigation(ofVec2f start, ofVec2f end) {
     navState.start = start;
     navState.end = end;
+    repositioned = false;
     setState(R_POSITIONING);
 }
 
@@ -346,19 +347,22 @@ void Robot::update() {
         cout << "STATE POSITIONING" << endl;
         // move in direction at magnitude
         if (inPosition(navState.start)) {
-            cmdStop(msg, false);
+            cmdStop(msg, !repositioned);
             shouldSend = true;
             setState(R_WAIT_AFTER_POSITION);
         } else {
+            repositioned = true;
             // move is different from draw
             moveRobot(msg, navState.start, false, shouldSend);
         }
     } else if (state == R_WAIT_AFTER_POSITION) {
         cout << "WAITING TO ROTATE" << endl;
-        cmdStop(msg, false);
+        cmdStop(msg, !repositioned);
         shouldSend = true;
-        if (elapsedStateTime > 1.0f) {
-//            setState(R_ROTATING_TO_DRAW);
+        if (!repositioned && !inPosition(navState.start)) {
+            // go right to waiting to draw
+            setState(R_WAITING_TO_DRAW);
+        } else if (elapsedStateTime > 0.10f) {
             setState(R_WAITING_TO_DRAW);
         } else if (!inPosition(navState.start)) {
             setState(R_POSITIONING);
@@ -406,7 +410,10 @@ void Robot::update() {
         cout << "WAITING TO DRAW" << endl;
         // wait for okay to draw
         if (navState.drawReady) {
-            if (elapsedStateTime > 1.0f) {
+            if (!repositioned) {
+                setState(R_DRAWING);
+                navState.drawReady = false;
+            } else if (elapsedStateTime > 0.05f) {
                 setState(R_DRAWING);
                 navState.drawReady = false;
             }
@@ -421,10 +428,13 @@ void Robot::update() {
     } else if (state == R_DONE_DRAWING) {
         cout << "DONE DRAWING" << endl;
         // we're stopped, pen is up
-        cmdStop(msg, true);
+        cmdStop(msg, !repositioned);
+        repositioned = false;
         shouldSend = true;
-
-		if (elapsedStateTime > 1.0f) {
+        
+        if (!repositioned) {
+            navState.readyForNextPath = true;
+        } else if (elapsedStateTime > 0.25f) {
 			navState.readyForNextPath = true;
 		}
     } else if (state == R_STOPPED) {

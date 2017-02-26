@@ -145,6 +145,7 @@ public:
     void startNavigation(ofVec2f start, ofVec2f end);
     bool setRotating;
     ofVec2f lastPos;
+    bool repositioned;
     
     // test commands
     void testRotate(float angle);

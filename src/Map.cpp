@@ -24,26 +24,32 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
     
     MapPath toStore = {false, lineType, segment};
     storeCount++;
-    
     bool shouldStore = true;
+        if ((segment.end - segment.start).length() < 0.01f) {
+        shouldStore = false;
+    }
     for (auto &path : mapPathStore[lineType]) {
         if (!shouldStore) {
             break;
         }
-        if(path.segment.start == segment.start && path.segment.end == segment.end) {
+        
+        const float kEpsilon = 0.01; // 1mm
+        if (path.segment.start.distance(segment.start) < kEpsilon && path.segment.end.distance(segment.end) < kEpsilon) {
             shouldStore = false;
-        } else if (path.segment.end == segment.start && path.segment.start == segment.end) {
+        } else if (path.segment.end.distance(segment.start) < kEpsilon && path.segment.start.distance(segment.end) < kEpsilon) {
             shouldStore = false;
         }
     }
     if (shouldStore) {
-        cout << "pathCount " << pathCount << " storeCount " << storeCount << endl;
+//        cout << "pathCount " << pathCount << " storeCount " << storeCount << endl;
         // check if pathype exists in pathtypes list
         if (!mapPathStore[lineType].size()) {
             pathTypes.push_back(lineType);
         }
         mapPathStore[lineType].push_back(toStore);
     }
+    
+//    cout << "stored " << storeCount << endl;
 }
 
 
@@ -116,7 +122,7 @@ void Map::loadMap(const string filename) {
                                 dest_y = stof(path.substr(startIndex, endIndex));
                                 storePath(lineType, move_x, move_y, dest_x, dest_y);
                                 pathCount++;
-                                cout << "stored: " << move_x << " " << move_y << " " << dest_x << " " << dest_y << endl;
+//                                cout << "stored: " << move_x << " " << move_y << " " << dest_x << " " << dest_y << endl;
                                 last_x = dest_x;
                                 last_y = dest_y;
                                 startIndex = l+1;
@@ -143,7 +149,7 @@ void Map::loadMap(const string filename) {
                                 endIndex = l-1;
                                 dest_y = stof(path.substr(startIndex, endIndex));
                                 storePath(lineType, last_x, last_y, dest_x, dest_y);
-                                cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
+//                                cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
                                 pathCount++;
                                 last_x = dest_x;
                                 last_y = dest_y;
@@ -153,7 +159,7 @@ void Map::loadMap(const string filename) {
                                 endIndex = l-1;
                                 dest_y = stof(path.substr(startIndex, endIndex));
                                 storePath(lineType, last_x, last_y, dest_x, dest_y);
-                                cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
+//                                cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
                                 pathCount++;
                                 startIndex = l+1;
                                 state = 1;
@@ -161,7 +167,7 @@ void Map::loadMap(const string filename) {
                                 endIndex = l-1;
                                 dest_y = stof(path.substr(startIndex, endIndex));
                                 storePath(lineType, dest_x, dest_y, firstX, firstY);
-                                cout << "stored: " << dest_x << " " << dest_y << " " << firstX << " " << firstY << endl;
+//                                cout << "stored: " << dest_x << " " << dest_y << " " << firstX << " " << firstY << endl;
                                 pathCount++;
                                 // todo: add edge case for Z in the middle of the string
                                 state = 1;
@@ -177,11 +183,11 @@ void Map::loadMap(const string filename) {
                         dest_y = stof(path.substr(startIndex, endIndex));
                         if (state == 6) {
                             storePath(lineType, last_x, last_y, dest_x, dest_y);
-                            cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
+//                            cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
                             pathCount++;
                         } else {
                             storePath(lineType, move_x, move_y, dest_x, dest_y);
-                            cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
+//                            cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
                             pathCount++;
                         }
                     }
@@ -195,37 +201,40 @@ void Map::loadMap(const string filename) {
 }
 
 
-bool Map::checkNextPath(ofVec2f initial) {
+bool Map::checkNextPath(const ofVec2f initial) {
 
     MapPath *next;
     bool foundNext;
     float minDist = INFINITY;
     
     for (auto &path : pathTypes) {
-        if (mapPathStore.find(path) != mapPathStore.end()) {
-            for (auto &mapPath : mapPathStore[path]) {
-                if (mapPath.drawn) {
-                    continue;
-                }
-                
-                ofVec2f startDir = mapPath.segment.start - initial;
-                ofVec2f endDir = mapPath.segment.end - initial;
-                float startDist = startDir.length();
-                float endDist = endDir.length();
-                
-                if (startDist < minDist) {
-                    minDist = startDist;
-                    next = &mapPath;
-                    foundNext = true;
-                } else if (endDist < minDist) {
-                    ofVec2f tmp = mapPath.segment.start;
-                    mapPath.segment.start = mapPath.segment.end;
-                    mapPath.segment.end = tmp;
+        if (mapPathStore.find(path) == mapPathStore.end()) {
+            continue;
+        }
 
-                    minDist = endDist;
-                    next = &mapPath;
-                    foundNext = true;
-                }
+        for (auto &mapPath : mapPathStore[path]) {
+            if (mapPath.drawn) {
+                continue;
+            }
+            
+            ofVec2f startDir = mapPath.segment.start - initial;
+            ofVec2f endDir = mapPath.segment.end - initial;
+
+            float startDist = startDir.length();
+            float endDist = endDir.length();
+            
+            if (startDist < minDist) {
+                minDist = startDist;
+                next = &mapPath;
+                foundNext = true;
+            } else if (endDist < minDist) {
+                ofVec2f tmp = mapPath.segment.start;
+                mapPath.segment.start = mapPath.segment.end;
+                mapPath.segment.end = tmp;
+
+                minDist = endDist;
+                next = &mapPath;
+                foundNext = true;
             }
         }
     }
