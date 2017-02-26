@@ -184,17 +184,67 @@ void Robot::rotateToDraw(char *msg, ofVec2f target, bool &shouldSend) {
 }
 
 void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend) {
+//    ofVec2f idealDir = navState.end - navState.start;
+    ofVec2f idealDir = navState.start - planePos;
+//    ofVec2f idealDir = planePos - navState.start;
 	ofVec2f dir = target - planePos;
 	float len = dir.length();
+    
+    float distFromStart = idealDir.length();
+    
+    cout << "DIST FROM START: " << distFromStart << endl;
+    
     
 	dir.normalize();
 	float mag = ofMap(len, 0, 1, 65, 250, true);
 	float rad = atan2(dir.y, dir.x);
 	float angle = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
+    headingRad = rad;
+    
+    idealDir.normalize();
+    idealRad = atan2(idealDir.y, idealDir.x);
+    float idealAngle = fmod(ofRadToDeg(idealRad) + 360 - 90, 360.0);
+    
+//    cout << "angle: " << angle << endl;
+//    cout << "IDEAL: " << idealAngle << endl;
+    
+    float angleDiff = fmod(((idealAngle + 360.0) - angle), 360.0);
+    float counterAngle;
+    if (distFromStart < 0.05f) {
+        counterAngle = angle;
+    } else {
+        counterAngle = fmod(angle - angleDiff, 360.0);
+    }
+    
+    counterRad = ofDegToRad(counterAngle);
+//    float idealRad = atan2(idealDir.y, idealDir.x);
+//    float idealAngle = fmod(idealRad - 90, 360.0);
+//    
+//    
+//    float counterAngle;
+//    float angleDiff = fmod((idealAngle + 360) - angle, 360.0);
+//    
+//    const float kRampStart = 0.02f, kRampEnd = 0.05f;
+//    if (distFromStart < kRampStart) {
+//        counterAngle = angle;
+//    } else {
+//        if (distFromStart < kRampEnd) {
+//            float amt = ofMap(distFromStart, kRampStart, kRampEnd, 0, 1);
+//            angleDiff *= amt * amt;
+//        } else {
+//            angleDiff /= 2.0;
+//        }
+//        counterAngle = fmod((angle+360) - angleDiff, 360.0);
+//    }
+    
+    
+    
+//    cout << "angleDiff: " << angleDiff << endl;
+//    cout << "COUNTER ANGLE: " << counterAngle << endl;
     
     if (drawing) {
         cout << "DRAWING" << endl;
-        cmdDraw(msg, angle, mag, rot);
+        cmdDraw(msg, counterAngle, mag, rot);
     } else {
         cout << "MOVING" << endl;
         cmdMove(msg, angle, mag, rot);
@@ -299,16 +349,16 @@ void Robot::update() {
         cout << "STATE POSITIONING" << endl;
         // move in direction at magnitude
         if (inPosition(navState.start)) {
-            cmdStop(msg, false);
+            cmdStop(msg, true);
             shouldSend = true;
-            setState(R_WAITING_TO_ROTATE);
+            setState(R_WAIT_AFTER_POSITION);
         } else {
             // move is different from draw
             moveRobot(msg, navState.start, false, shouldSend);
         }
-    } else if (state == R_WAITING_TO_ROTATE) {
+    } else if (state == R_WAIT_AFTER_POSITION) {
         cout << "WAITING TO ROTATE" << endl;
-        cmdStop(msg, false);
+        cmdStop(msg, true);
         shouldSend = true;
         if (elapsedStateTime > 1.0f) {
 //            setState(R_ROTATING_TO_DRAW);

@@ -22,7 +22,7 @@ typedef enum RobotState {
 	R_ROTATING_TO_ANGLE,
 	R_WAITING_ANGLE,
 	R_POSITIONING,
-    R_WAITING_TO_ROTATE,
+    R_WAIT_AFTER_POSITION,
     R_ROTATING_TO_DRAW,
     R_WAITING_DRAW_ANGLE,
     R_WAITING_TO_DRAW,
@@ -145,6 +145,12 @@ public:
     // test commands
     void testRotate(float angle);
     void testMove(float direction, float magnitude);
+    
+    // visualizing states
+    float idealRad;
+    float counterRad;
+    float headingRad;
+    
 };
 
 #endif

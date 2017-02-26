@@ -7,7 +7,7 @@ static const bool ROBOTS_DRAW = true;
 
 static const float MAP_W = 2.0f;
 static const float MAP_H = 2.0f;
-static const float OFFSET_X = -1.2f;
+static const float OFFSET_X = -1.0f;
 static const float OFFSET_Y = -0.5f;
 
 char udpMessage[1024];
@@ -350,7 +350,25 @@ void ofApp::draw(){
 		ofSetColor(0, 255, 255);
 		ofDrawLine(c1, u);
         
+        // draw arrows
         
+        float proj = 0.5;
+//        float rad = ofDegToRad(r.headingAngle);
+        ofVec2f projPos;
+        projPos.x = r.planePos.x + cos(r.headingRad)*proj;
+        projPos.y = r.planePos.y + sin(r.headingRad)*proj;
+        ofSetColor(150, 150, 150);
+        ofDrawLine(r.planePos, projPos);
+        
+        projPos.x = r.planePos.x + cos(r.idealRad)*proj;
+        projPos.y = r.planePos.y + sin(r.idealRad)*proj;
+        ofSetColor(0, 255, 0);
+        ofDrawLine(r.planePos, projPos);
+        
+        projPos.x = r.planePos.x + cos(r.counterRad)*proj;
+        projPos.y = r.planePos.y + sin(r.counterRad)*proj;
+        ofSetColor(255, 0, 0);
+        ofDrawLine(r.planePos, projPos);
 
 		ofSetColor(255, 255, 255);
 		ofDrawSphere(cen, kMarkerSizeM / 4.0);
