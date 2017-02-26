@@ -11,7 +11,7 @@
 static const float kTolerance = 0.01f;
 
 static const float kHeartbeatTimeoutSec = 2.0f;
-static const float kCameraTimeoutSec = 0.5f;
+static const float kCameraTimeoutSec = 1.0f;
 
 static const float kPenMovementTime = 0.1f;
 
@@ -127,11 +127,8 @@ void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const o
 	// Translate to the center of the marker
     
     planePos.set(worldPos.x, worldPos.y);
-    
-    // offset center of the robot
-//    ofVec3f center = ofVec3f(kMarkerSizeM / 2.0, kMarkerSizeM / 2.0, 0.0)*mat;
-//    planePos.set(center.x, center.y);
-    
+    avgPlanePos += (planePos - avgPlanePos) * 0.25;
+    slowAvgPlanePos += (planePos - slowAvgPlanePos) * 0.075;
     
 	// Get z-axis rotation
 	ofVec3f angAxis = ofVec3f(0.0, 1.0, 0.0) * mat;
@@ -184,67 +181,67 @@ void Robot::rotateToDraw(char *msg, ofVec2f target, bool &shouldSend) {
 }
 
 void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend) {
-//    ofVec2f idealDir = navState.end - navState.start;
-    ofVec2f idealDir = navState.start - planePos;
-//    ofVec2f idealDir = planePos - navState.start;
-	ofVec2f dir = target - planePos;
-	float len = dir.length();
+    ofVec2f line = navState.end - navState.start;
+
+    ofVec2f startToCurrent = planePos - navState.start;
+	ofVec2f currentToEnd = target - planePos;
     
-    float distFromStart = idealDir.length();
+    ofVec2f startToAvg = avgPlanePos - navState.start;
+    ofVec2f avgToEnd = navState.end - slowAvgPlanePos;
     
-    cout << "DIST FROM START: " << distFromStart << endl;
+    ofVec2f actualDir = avgPlanePos - slowAvgPlanePos;
+    dist = actualDir.length();
     
+	float distToTarget = currentToEnd.length();
+    float distFromStart = startToCurrent.length();
     
-	dir.normalize();
-	float mag = ofMap(len, 0, 1, 65, 250, true);
-	float rad = atan2(dir.y, dir.x);
-	float angle = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
-    headingRad = rad;
+    line.normalize();
+    startToCurrent.normalize();
+    currentToEnd.normalize();
     
-    idealDir.normalize();
-    idealRad = atan2(idealDir.y, idealDir.x);
-    float idealAngle = fmod(ofRadToDeg(idealRad) + 360 - 90, 360.0);
+    actualDir.normalize();
+    avgToEnd.normalize();
     
-//    cout << "angle: " << angle << endl;
-//    cout << "IDEAL: " << idealAngle << endl;
+    float actualRad = atan2(actualDir.y, actualDir.x);
+    float avgToEndRad = atan2(avgToEnd.y, avgToEnd.x);
+    float actualDeg = fmod(ofRadToDeg(actualRad) + 360 - 90, 360.0);
+    float avgToEndDeg = fmod(ofRadToDeg(avgToEndRad) + 360 - 90, 360.0);
     
-    float angleDiff = fmod(((idealAngle + 360.0) - angle), 360.0);
-    float counterAngle;
-    if (distFromStart < 0.05f) {
-        counterAngle = angle;
-    } else {
-        counterAngle = fmod(angle - angleDiff, 360.0);
+    float actualAngleDiffDeg = ofAngleDifferenceDegrees(avgToEndDeg, actualDeg);
+    float whereShouldIReallyGo = fmod(avgToEndDeg - actualAngleDiffDeg + 360.0, 360.0);
+    counterRad = ofDegToRad(whereShouldIReallyGo + 90);
+    
+    idealRad = ofDegToRad(actualDeg + 90);
+    
+//    ofVec2f targetMinusActual = avgToEnd
+    
+    float angle, idealAngle, angleDiff, finalAngle;
+//
+    {
+        float rad = atan2(currentToEnd.y, currentToEnd.x);
+        angle = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
+        headingRad = rad;
     }
     
-    counterRad = ofDegToRad(counterAngle);
-//    float idealRad = atan2(idealDir.y, idealDir.x);
-//    float idealAngle = fmod(idealRad - 90, 360.0);
-//    
-//    
-//    float counterAngle;
-//    float angleDiff = fmod((idealAngle + 360) - angle, 360.0);
-//    
-//    const float kRampStart = 0.02f, kRampEnd = 0.05f;
-//    if (distFromStart < kRampStart) {
-//        counterAngle = angle;
-//    } else {
-//        if (distFromStart < kRampEnd) {
-//            float amt = ofMap(distFromStart, kRampStart, kRampEnd, 0, 1);
-//            angleDiff *= amt * amt;
-//        } else {
-//            angleDiff /= 2.0;
-//        }
-//        counterAngle = fmod((angle+360) - angleDiff, 360.0);
+    if (dist < 0.01f) {
+        whereShouldIReallyGo = angle;
+    }
+//
+//    {
+//        line = avgToEnd;
+//        
+//        idealRad = atan2(line.y, line.x);
+//        idealAngle = fmod(ofRadToDeg(idealRad) + 360 - 90, 360.0);
 //    }
+//
+//    angleDiff = idealAngle - angle;
+//    finalAngle = fmod(angle - angleDiff + 360, 360.0);
+//    counterRad = ofDegToRad(finalAngle + 90);
     
-    
-    
-//    cout << "angleDiff: " << angleDiff << endl;
-//    cout << "COUNTER ANGLE: " << counterAngle << endl;
-    
+    float mag = ofMap(distToTarget, 0, 1, 70, 250, true);
     if (drawing) {
         cout << "DRAWING" << endl;
-        cmdDraw(msg, counterAngle, mag, rot);
+        cmdDraw(msg, whereShouldIReallyGo, mag, rot);
     } else {
         cout << "MOVING" << endl;
         cmdMove(msg, angle, mag, rot);
@@ -349,7 +346,7 @@ void Robot::update() {
         cout << "STATE POSITIONING" << endl;
         // move in direction at magnitude
         if (inPosition(navState.start)) {
-            cmdStop(msg, true);
+            cmdStop(msg, false);
             shouldSend = true;
             setState(R_WAIT_AFTER_POSITION);
         } else {
@@ -358,7 +355,7 @@ void Robot::update() {
         }
     } else if (state == R_WAIT_AFTER_POSITION) {
         cout << "WAITING TO ROTATE" << endl;
-        cmdStop(msg, true);
+        cmdStop(msg, false);
         shouldSend = true;
         if (elapsedStateTime > 1.0f) {
 //            setState(R_ROTATING_TO_DRAW);
@@ -444,4 +441,5 @@ void Robot::update() {
 	if (shouldSend && enableMessages) {
 		sendMessage(msg);
 	}
+    lastPos = planePos;
 }

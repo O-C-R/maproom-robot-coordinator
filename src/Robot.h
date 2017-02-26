@@ -87,7 +87,7 @@ public:
 	// Derived from CV
 	ofMatrix4x4 mat;
 	ofVec3f worldPos;
-	ofVec2f planePos;
+    ofVec2f planePos, avgPlanePos, slowAvgPlanePos;
 	float rot;
     
     // navigation
@@ -101,6 +101,9 @@ public:
 		state(R_NO_CONN),
         enableMessages(false),
 		penState(P_UNKNOWN),
+        planePos(0, 0),
+        avgPlanePos(0, 0),
+        slowAvgPlanePos(0, 0),
 		targetRot(120),
 		targetPlanePos(0, 0),
 		stateStartTime(0),
@@ -141,6 +144,7 @@ public:
     void setPathType(int pathType);
     void startNavigation(ofVec2f start, ofVec2f end);
     bool setRotating;
+    ofVec2f lastPos;
     
     // test commands
     void testRotate(float angle);
@@ -149,8 +153,9 @@ public:
     // visualizing states
     float idealRad;
     float counterRad;
+    float dist;
     float headingRad;
-    
+
 };
 
 #endif

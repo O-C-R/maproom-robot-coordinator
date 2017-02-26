@@ -313,10 +313,11 @@ void ofApp::draw(){
         
 		// Debug output
 
-		sprintf(buf, "%d - %s %s - posCm = (%+07.1f, %+07.1f) - heightCm = %+04.1f - rotDeg = %03.1f (%s)",
+		sprintf(buf, "%d - %s %s - %+04.1f - posCm = (%+07.1f, %+07.1f) - heightCm = %+04.1f - rotDeg = %03.1f (%s)",
             r.id,
             r.commsUp() ? "CONNECTED" : "DISCONNECTED",
             r.cvDetected() ? "SEEN" : "HIDDEN",
+            r.dist * 100.0,
             r.planePos.x * 100.0, r.planePos.y * 100.0,
             r.worldPos.z * 100.0,
             r.rot,
