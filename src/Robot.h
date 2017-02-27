@@ -55,7 +55,8 @@ public:
 	int id;
 	string name;
 	int markerId;
-
+    ofColor color;
+    
 	// State machine
 	RobotState state;
 	PenState penState;
@@ -94,10 +95,11 @@ public:
     ofVec2f targetPos;
     bool getInitial;
     
-	Robot(int rId, int mId, const string &n) :
+	Robot(int rId, int mId, const string &n, ofColor color) :
 		id(rId),
 		markerId(mId),
 		name(n),
+        color(color),
 		state(R_NO_CONN),
         enableMessages(false),
 		penState(P_UNKNOWN),
@@ -110,7 +112,8 @@ public:
 		lastCameraUpdateTime(-1000),
 		lastHeartbeatTime(-1000),
 		positionIdx(0),
-        getInitial(true)
+        getInitial(true),
+        debugPos(false)
 	{}
 
 	// Setup communication - must be called before sending any messages
@@ -157,6 +160,8 @@ public:
     float dist;
     float headingRad;
 
+    // debug robots
+    bool debugPos;
 };
 
 #endif

@@ -17,7 +17,8 @@ Map *currentMap;
 vector<MapPath> pathsDrawn;
 vector<vector<ofVec2f>> robotPaths; // paths for reach robot, indexed by ID
 bool getNextPath = false;
-
+map<int, ofxDatGuiFolder*> robotFolders;
+map<int, ofxDatGui2dPad*> robotPositions;
 
 //--------------------------------------------------------------
 void ofApp::setup(){
@@ -46,7 +47,7 @@ void ofApp::setup(){
 
 	cameraToWorldInv = cameraToWorld.getInverse();
 
-	Robot *r01 = new Robot(2, 24, "Delmar");
+    Robot *r01 = new Robot(2, 24, "Delmar", ofColor::red);
 	robotsById[r01->id] = r01;
 	robotsByMarker[r01->markerId] = r01;
 	r01->setCommunication("192.168.1.70", 5111);
@@ -64,25 +65,20 @@ void ofApp::setup(){
     for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
         int robotId = it->first;
         Robot &r = *it->second;
-        gui->addLabel("Robot ID: " + ofToString(r.id));
-        gui->addLabel("Robot Name: " + ofToString(r.name.c_str()));
-        
         float startingAngle = 0;
-        float startingDir = 0;
-        float startingMag = 0;
-        r.targetRot = startingAngle;
-        r.moveDir = startingDir;
-        r.moveMag = startingMag;
-        
+        gui->addLabel("Robot " + ofToString(r.id) + " - " + ofToString(r.name.c_str()));
         gui->addToggle("Messages Enabled " + ofToString(r.id), false);
-        gui->addButton("Stop: " + ofToString(r.id));
         gui->addButton("Start: " + ofToString(r.id));
-        gui->addButton("Calibrate: " + ofToString(r.id));
+        gui->addButton("Stop: " + ofToString(r.id));
         gui->addButton("Next Path: " + ofToString(r.id));
-        gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, startingAngle);
-        gui->addButton("Rotate: " + ofToString(r.id));
-        gui->addButton("Start Drawing: " + ofToString(r.id));
-        gui->addBreak();
+        robotFolders[r.id] = gui->addFolder("DEBUG " + ofToString(r.id) + " - " + ofToString(r.name.c_str()), r.color);
+        robotFolders[r.id]->addToggle("Debug position: " + ofToString(r.id), false);
+//        robotFolders[r.id]->add2dPad("Set Position " + ofToString(r.id), ));
+        robotFolders[r.id]->addButton("Calibrate: " + ofToString(r.id));
+        robotFolders[r.id]->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, 0);
+        robotFolders[r.id]->addButton("Rotate: " + ofToString(r.id));
+        robotFolders[r.id]->expand();
+        robotFolders[r.id]->addBreak();
     }
     gui->addButton("Reload Map");
     
@@ -254,7 +250,7 @@ void ofApp::draw(){
 		ofVec3f pos = ofVec3f(0.0) * cameraToWorld;
 		ofSetColor(255, 255, 255);
         ofNoFill();
-		ofDrawIcoSphere(pos, 0.02);
+//		ofDrawIcoSphere(pos, 0.02);
 		ofPopStyle();
 		ofPopMatrix();
 	}
@@ -357,15 +353,15 @@ void ofApp::draw(){
 //		ofDrawAxis(1.0);
 
 		// Option 2: draw a robot
-		ofSetColor(255, 255, 0);
-		ofDrawLine(c1, c3);
-		ofSetColor(255, 0, 0);
-		ofDrawLine(c1, c4);
-		ofSetColor(255, 255, 255);
-		ofDrawLine(c2, c3);
-		ofDrawLine(c2, c4);
-		ofSetColor(0, 255, 255);
-		ofDrawLine(c1, u);
+//		ofSetColor(255, 255, 0);
+//		ofDrawLine(c1, c3);
+//		ofSetColor(255, 0, 0);
+//		ofDrawLine(c1, c4);
+//		ofSetColor(255, 255, 255);
+//		ofDrawLine(c2, c3);
+//		ofDrawLine(c2, c4);
+//		ofSetColor(0, 255, 255);
+//		ofDrawLine(c1, u);
         
         // draw arrows
         
@@ -387,8 +383,8 @@ void ofApp::draw(){
         ofSetColor(255, 0, 0);
         ofDrawLine(r.planePos, projPos);
 
-		ofSetColor(255, 255, 255);
-		ofDrawSphere(cen, kMarkerSizeM / 4.0);
+//		ofSetColor(255, 255, 255);
+//		ofDrawSphere(cen, kMarkerSizeM / 4.0);
 
         
 		ofPopStyle();
@@ -427,6 +423,8 @@ void ofApp::onToggleEvent(ofxDatGuiToggleEvent e)
         Robot &r = *it->second;
         if (e.target->is("messages enabled " + ofToString(r.id))) {
             r.enableMessages = e.checked;
+        } else if (e.target->is("debug position: " + ofToString(r.id))) {
+            r.debugPos = e.checked;
         }
     }
 }
@@ -450,8 +448,6 @@ void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
         } else if (e.target->is("rotate: " + ofToString(r.id))) {
             cout << "ROTATING " << ofToString(r.id) << endl;
             r.testRotate(r.targetRot);
-        } else if (e.target->is("start drawing: " + ofToString(r.id))) {
-            r.navState.readyForNextPath = true;
         } else if (e.target->is("start: " + ofToString(r.id))) {
             r.start();
         } else if (e.target->is("next path: " + ofToString(r.id))) {
