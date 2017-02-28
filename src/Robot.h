@@ -57,7 +57,7 @@ public:
 	void gotHeartbeat();
 
 	// Update from CV
-	void updateCamera(const ofVec3f &rvec, const ofVec3f &tvec, const ofMatrix4x4 &cameraWorldInv);
+	void updateCamera(const ofVec3f &rvec, const ofVec3f &tvec, const ofMatrix3x3 &rmat, const ofMatrix4x4 &cameraWorldInv);
 
 	// Update during loop
 	void update();

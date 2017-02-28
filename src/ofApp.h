@@ -21,7 +21,10 @@ typedef struct RobotGui {
 	ofxDatGuiFolder *folder;
 
 	ofxDatGuiLabel *stateLabel, *posLabel;
+	ofxDatGuiLabel *lastMessageLabel;
 	ofxDatGuiToggle *enableToggle;
+
+	ofxDatGuiSlider *kp, *ki, *kd;
 
 	ofxDatGuiButton *calibrateButton, *advanceButton;
 	ofxDatGuiSlider *rotationAngleSlider;
@@ -46,12 +49,6 @@ class ofApp : public ofBaseApp{
 		void windowResized(int w, int h);
 		void dragEvent(ofDragInfo dragInfo);
 		void gotMessage(ofMessage msg);
-    
-        // DatGui events
-        void onButtonEvent(ofxDatGuiButtonEvent e);
-        void onToggleEvent(ofxDatGuiToggleEvent e);
-        void onSliderEvent(ofxDatGuiSliderEvent e);
-        void onTextInputEvent(ofxDatGuiTextInputEvent e);
 
 	void setState(MaproomState newState);
 	string stateString();

@@ -90,6 +90,7 @@ void ofApp::setup() {
 
         rGui.stateLabel = rGui.folder->addLabel(r.stateDescription());
 		rGui.posLabel = rGui.folder->addLabel(r.positionString());
+		rGui.lastMessageLabel = rGui.folder->addLabel("");
         rGui.enableToggle = rGui.folder->addToggle("Enabled", true);
         rGui.calibrateButton = rGui.folder->addButton("Calibrate");
         rGui.advanceButton = rGui.folder->addButton("Skip path");
@@ -108,11 +109,44 @@ void ofApp::setup() {
 			r.targetRot = e.value;
 		});
 
+		rGui.folder->addBreak();
+
+		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
+		rGui.kp->setValue(2500.0);
+		rGui.ki = rGui.folder->addSlider("ki", 0, 100);
+		rGui.ki->setValue(0.0);
+		rGui.kd = rGui.folder->addSlider("kd", 0, 10000);
+		rGui.kd->setValue(0.0);
+		ofxDatGuiSlider *kiMax = rGui.folder->addSlider("kiMax", 0, 10000);
+		kiMax->setValue(0.0);
+		rGui.kp->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+			r.targetLinePID.setP(e.value);
+		});
+		rGui.ki->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+			r.targetLinePID.setI(e.value);
+		});
+		rGui.kd->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+			r.targetLinePID.setD(e.value);
+		});
+		kiMax->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+			r.targetLinePID.setMaxIOutput(e.value);
+		});
+
 		gui->addBreak();
     }
-    gui->addButton("Reload Map");
-	gui->addFRM();
 
+    ofxDatGuiButton *reloadMapButton = gui->addButton("Reset Map");
+	reloadMapButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
+		for (auto &i : currentMap->mapPathStore) {
+			for (auto &j : i.second) {
+				j.claimed = false;
+				j.drawn = false;
+			}
+		}
+	});
+
+
+	gui->addFRM();
 
 	// Listen for messages from camera
 	oscReceiver.setup( PORT );
@@ -206,13 +240,16 @@ void ofApp::handleOSC() {
 				int markerId = jsonMsg["ids"][i].asInt();
 				ofVec3f rvec(jsonMsg["rvecs"][i][0].asFloat(), jsonMsg["rvecs"][i][1].asFloat(), jsonMsg["rvecs"][i][2].asFloat());
 				ofVec3f tvec(jsonMsg["tvecs"][i][0].asFloat(), jsonMsg["tvecs"][i][1].asFloat(), jsonMsg["tvecs"][i][2].asFloat());
+				ofMatrix3x3 rmat(jsonMsg["rmats"][i][0][0].asFloat(), jsonMsg["rmats"][i][0][1].asFloat(), jsonMsg["rmats"][i][0][2].asFloat(),
+								 jsonMsg["rmats"][i][1][0].asFloat(), jsonMsg["rmats"][i][1][1].asFloat(), jsonMsg["rmats"][i][1][2].asFloat(),
+								 jsonMsg["rmats"][i][2][0].asFloat(), jsonMsg["rmats"][i][2][1].asFloat(), jsonMsg["rmats"][i][2][2].asFloat());
 
 				if (robotsByMarker.find(markerId) == robotsByMarker.end()) {
 					// Erroneous marker
 					continue;
 				}
 
-				robotsByMarker[markerId]->updateCamera(rvec, tvec, cameraToWorldInv);
+				robotsByMarker[markerId]->updateCamera(rvec, tvec, rmat, cameraToWorldInv);
 			}
 		}
 	}
@@ -291,6 +328,7 @@ void ofApp::commandRobots() {
 
 			gui.stateLabel->setLabel(r.stateDescription());
 			gui.posLabel->setLabel(r.positionString());
+			gui.lastMessageLabel->setLabel(r.lastMessage.length() > 0 ? r.lastMessage : "Unknown");
 		}
 
 
@@ -495,6 +533,9 @@ void ofApp::draw(){
 //		ofSetColor(255, 255, 255);
 //		ofDrawSphere(cen, kMarkerSizeM / 16.0);
 
+		ofPopStyle();
+		ofPopMatrix();
+
 		ofSetColor(255, 0, 0);
 		ofDrawLine(r.planePos, r.planePos + r.vecToEnd / 1000.0f);
 
@@ -506,9 +547,6 @@ void ofApp::draw(){
 
 		ofSetColor(255, 255, 0);
 		ofDrawLine(r.planePos, r.planePos + r.movement / 1000.0f);
-        
-		ofPopStyle();
-		ofPopMatrix();
         
         ofPushStyle();
         ofNoFill();
@@ -530,65 +568,6 @@ void ofApp::loadMap(const string &mapName) {
     for (auto &p : robotsById) {
         int id = p.first;
         Robot &r = *p.second;
-    }
-}
-
-void ofApp::onToggleEvent(ofxDatGuiToggleEvent e)
-{
-    for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
-        int robotId = it->first;
-        Robot &r = *it->second;
-        if (e.target->is("messages enabled " + ofToString(r.id))) {
-            r.enabled = e.checked;
-        }
-    }
-}
-
-
-void ofApp::onButtonEvent(ofxDatGuiButtonEvent e)
-{
-    for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
-        int robotId = it->first;
-        Robot &r = *it->second;
-        
-        if (e.target->is("stop: " + ofToString(r.id))) {
-            r.stop();
-            cout << "STOPPING " << ofToString(r.id) << endl;
-        } else if (e.target->is("calibrate: " + ofToString(r.id))) {
-            r.calibrate();
-            cout << "CALIBRATING " << ofToString(r.id) << endl;
-        } else if (e.target->is("start: " + ofToString(r.id))) {
-            r.start();
-        } else if (e.target->is("next path: " + ofToString(r.id))) {
-//            if(currentMap->checkNextPath(r.navState.end)) {
-//                loadNextPath(&r);
-//            } else {
-//                cout << "no more paths" << endl;
-//            }
-        }
-    }
-    if (e.target->is("reload map")) {
-        cout << "RELOADING MAP " << endl;
-        loadMap(currentFile);
-    }
-}
-
-void ofApp::onSliderEvent(ofxDatGuiSliderEvent e)
-{
-    for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
-        int robotId = it->first;
-        Robot &r = *it->second;
-        
-        if (e.target->is("rotation angle: " + ofToString(r.id))) {
-            cout << "set rotation angle of  " << e.value << endl;
-            r.targetRot = e.value;
-        } else if (e.target->is("move dir: " + ofToString(r.id))) {
-            cout << "move dir set to " << e.value << endl;
-//            r.moveDir = e.value;
-        } else if (e.target->is("move mag: " + ofToString(r.id))) {
-            cout << "move mag set to " << e.value << endl;
-//            r.moveMag = e.value;
-        }
     }
 }
 

@@ -79,10 +79,9 @@ Robot::Robot(int rId, int mId, const string &n) :
 	lastCameraUpdateTime(-1000),
 	cvFramerate(0),
 	lastHeartbeatTime(-1000),
-	targetLinePID(2500.0, 0, 0)
+	targetLinePID(3200.0, 7, 700)
 {
-	targetLinePID.setMaxIOutput(2000.0);
-	targetLinePID.setOutputLimits(-100000000.0, 100000000.0);
+	targetLinePID.setMaxIOutput(500.0);
 }
 
 void Robot::setCommunication(const string &rIp, int rPort) {
@@ -112,9 +111,6 @@ void Robot::stop() {
 	if (state != R_STOPPED) {
 		setState(R_STOPPED);
 	}
-
-    cmdStop(msg);
-	sendMessage(msg);
 }
 
 void Robot::start() {
@@ -129,7 +125,11 @@ string Robot::stateDescription() {
 
 string Robot::positionString() {
 	char buf[512];
-	sprintf(buf, "(%+07.1f, %+07.1f) @ %03.1f%c (%.1f fps)", avgPlanePos.x * 100.0, avgPlanePos.y * 100.0, avgRot, char(176), cvFramerate);
+	sprintf(buf, "(%+07.1f, %+07.1f, %+07.1f) @ %03.1f%c (%.1f fps)",
+			avgPlanePos.x * 100.0, avgPlanePos.y * 100.0,
+			mat.getTranslation().z * 100.0,
+			avgRot, char(176),
+			cvFramerate);
 	return buf;
 }
 
@@ -164,7 +164,8 @@ string Robot::stateString() {
 	}
 }
 
-void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix4x4 &cameraWorldInv) {
+// TODO: fix this math somehow
+void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix3x3 &rmat, const ofMatrix4x4 &cameraWorldInv) {
 	rvec = newRvec;
 	tvec = newTvec;
 
@@ -248,7 +249,7 @@ void Robot::setState(RobotState newState) {
 void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 	// Vectors for movement - ideal and remaining
     const ofVec2f line = targetPlanePos - startPlanePos;
-	const ofVec2f currentToEnd = targetPlanePos - planePos;
+	ofVec2f currentToEnd = targetPlanePos - planePos;
 
 	// Calculate where and how fast we'd go to just get to the end
 	const float distanceToEnd = currentToEnd.length();
@@ -261,11 +262,18 @@ void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 	const float distToLine = dirToLine.length();
 	const double targetLinePIDOutput = targetLinePID.getOutput(distToLine, 0.0);
 	backToLine = targetLinePIDOutput * ofVec2f(dirToLine).normalize() * -1.0;
+	backToLine *= ofMap(distanceToEnd, 0, 1, 0.5, 2.0, true);
 
 	// Combine the two vectors
 	movement = (vecToEnd + backToLine).normalize() * forwardMag;
-	const float angle = ofRadToRobotDeg(atan2(movement.y, movement.x));
+	float angle = ofRadToRobotDeg(atan2(movement.y, movement.x));
 	const float mag = movement.length();
+
+	if (distanceToEnd < 0.02f) {
+		// If we're really close to the end, just get there.
+		currentToEnd.normalize();
+		angle = ofRadToRobotDeg(atan2(currentToEnd.y, currentToEnd.x));
+	}
 
 	// Send message
 	if (drawing) {
@@ -278,7 +286,7 @@ void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 }
 
 bool Robot::atRotation() {
-	return ofAngleDifferenceDegrees(targetRot, avgRot) < kRotationTolerance;
+	return abs(ofAngleDifferenceDegrees(targetRot, avgRot)) < kRotationTolerance;
 }
 
 bool Robot::inPosition(const ofVec2f &pos) {
@@ -338,15 +346,15 @@ void Robot::update() {
 	} else if (state == R_CALIBRATING_ANGLE) {
 		// We're calibrating the angle for a bit
 
-		cmdStop(msg);
-		sendMessage(msg);
-
-		cmdCalibrateAngle(msg, avgRot);
-		shouldSend = true;
-        
-		if (elapsedStateTime >= kCalibrationWaitSec) {
+		if (elapsedStateTime < 0.5f) {
+			cmdStop(msg);
+			shouldSend = true;
+		} else if (elapsedStateTime >= 3.0f) {
 			// We've calibrated enough
             setState(R_ROTATING_TO_ANGLE);
+		} else {
+			cmdCalibrateAngle(msg, avgRot);
+			shouldSend = true;
 		}
     } else if (state == R_ROTATING_TO_ANGLE) {
 		// We're rotating to a target angle
@@ -368,15 +376,15 @@ void Robot::update() {
 	} else if (state == R_WAITING_ANGLE) {
 		// We're waiting after issuing rotate commands
 
-		if (elapsedStateTime > kAngleWaitSec) {
+		if (elapsedStateTime > 1.0f && !atRotation()) {
+			// We're out of tolerance, try calibrating again.
+			setState(R_CALIBRATING_ANGLE);
+		} else if (elapsedStateTime > kAngleWaitSec) {
 			// We've waited long enough, let's move on to positioning.
 			cmdStop(msg, false);
 			shouldSend = true;
 
 			setState(R_READY_TO_POSITION);
-		} else if (!atRotation()) {
-			// We're out of tolerance, try calibrating again.
-			setState(R_CALIBRATING_ANGLE);
 		}
 	} else if (state == R_READY_TO_POSITION) {
 		// Pass - wait for controller to give the go-ahead.
@@ -426,7 +434,7 @@ void Robot::update() {
 	}
 
 	// Only send messages every so often to avoid hammering the Arduino.
-	if (mustSend || (shouldSend && ofGetFrameNum() % 4 == 0)) {
+	if (mustSend || (shouldSend && ofGetFrameNum() % 6 == 0)) {
 		sendMessage(msg);
 	}
 }
