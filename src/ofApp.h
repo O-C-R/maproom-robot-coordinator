@@ -11,12 +11,19 @@
 
 #define PORT 5100
 
+typedef enum MaproomState {
+	MR_RUNNING,
+	MR_PAUSED,
+	MR_STOPPED
+} MaproomState;
+
 class ofApp : public ofBaseApp{
 
 	public:
 		void setup();
 		void update();
 		void draw();
+		void exit();
 
 		void keyPressed(int key);
 		void keyReleased(int key);
@@ -36,11 +43,9 @@ class ofApp : public ofBaseApp{
         void onSliderEvent(ofxDatGuiSliderEvent e);
         void onTextInputEvent(ofxDatGuiTextInputEvent e);
     
-    void updateGui();
 	void handleOSC();
 	void receiveFromRobots();
 	void commandRobots();
-    void robotConductor();
     
     void loadMap(string name);
     void loadNextPath(Robot* r);
@@ -60,8 +65,14 @@ private:
 
 	map<int, Robot*> robotsById;
 	map<int, Robot*> robotsByMarker;
+	map<int, MapPath*> robotPaths;
+
+	map<int, vector<ofVec2f>> robotPositions;
+	map<int, int> robotPositionsCount;
+	map<int, int> robotPositionsIdx;
 
 	ofxDatGui *gui;
     
     Map *currentMap;
+	MaproomState state;
 };

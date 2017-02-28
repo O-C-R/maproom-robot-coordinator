@@ -17,22 +17,18 @@ typedef struct pathSegment {
 } pathSegment;
 
 typedef struct MapPath {
-    bool drawn;
+    bool claimed, drawn;
+
     string type;
 	pathSegment segment;
 } MapPath;
-
 
 class Map {
 public:
 	Map(float widthM, float heightM, float offsetX, float offsetY);
 	void loadMap(const string filename);
     
-	bool checkNextPath();
-    bool checkNextPath(ofVec2f initial);
-    bool checkNextPath(ofVec2f initial, string pathType);
-    
-	MapPath getNextPath();
+	MapPath* nextPath(const ofVec2f &initial);
     
     ofxXmlSettings currentMap;
     
@@ -44,7 +40,6 @@ public:
     
 private:
 	float widthM, heightM, offsetX, offsetY, scaleX, scaleY;
-    MapPath nextPath;
 	vector<MapPath> paths;
 };
 
