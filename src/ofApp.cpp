@@ -9,6 +9,8 @@ static const float MAP_H = 1.0f;
 static const float OFFSET_X = -0.5f;
 static const float OFFSET_Y = -0.5f;
 
+static const int kNumPathsToSave = 10000;
+
 static char udpMessage[1024];
 static char buf[1024];
 
@@ -292,17 +294,19 @@ void ofApp::commandRobots() {
 		}
 
 
-		// Record robot location
-		if (robotPositionsCount.find(id) == robotPositionsCount.end()) {
-			robotPositions[id].reserve(1000);
-			robotPositionsCount[id] = 0;
-			robotPositionsIdx[id] = 0;
+		if (ofGetElapsedTimef() > 3.0f) {
+			// Record robot location
+			if (robotPositionsCount.find(id) == robotPositionsCount.end()) {
+				robotPositions[id].reserve(kNumPathsToSave);
+				robotPositionsCount[id] = 0;
+				robotPositionsIdx[id] = 0;
+			}
+			robotPositions[id][robotPositionsIdx[id]] = r.avgPlanePos;
+			if (robotPositionsCount[id] < kNumPathsToSave) {
+				robotPositionsCount[id]++;
+			}
+			robotPositionsIdx[id] = (robotPositionsIdx[id] + 1) % kNumPathsToSave;
 		}
-		robotPositions[id][robotPositionsIdx[id]] = r.avgPlanePos;
-		if (robotPositionsCount[id] < 1000) {
-			robotPositionsCount[id]++;
-		}
-		robotPositionsIdx[id] = (robotPositionsIdx[id] + 1) % 1000;
 	}
 }
 
@@ -391,7 +395,7 @@ void ofApp::draw(){
 			if (j.drawn) {
 				ofSetColor(255, 255, 255);
 			} else if (j.claimed) {
-				ofSetColor(200, 200, 0);
+				ofSetColor(200, 0, 200);
 			} else {
 				ofSetColor(50, 50, 50);
 			}
