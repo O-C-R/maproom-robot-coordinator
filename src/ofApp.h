@@ -17,6 +17,16 @@ typedef enum MaproomState {
 	MR_STOPPED
 } MaproomState;
 
+typedef struct RobotGui {
+	ofxDatGuiFolder *folder;
+
+	ofxDatGuiLabel *stateLabel, *posLabel;
+	ofxDatGuiToggle *enableToggle;
+
+	ofxDatGuiButton *calibrateButton, *advanceButton;
+	ofxDatGuiSlider *rotationAngleSlider;
+} RobotGui;
+
 class ofApp : public ofBaseApp{
 
 	public:
@@ -42,7 +52,11 @@ class ofApp : public ofBaseApp{
         void onToggleEvent(ofxDatGuiToggleEvent e);
         void onSliderEvent(ofxDatGuiSliderEvent e);
         void onTextInputEvent(ofxDatGuiTextInputEvent e);
-    
+
+	void setState(MaproomState newState);
+	string stateString();
+	void updateGui();
+
 	void handleOSC();
 	void receiveFromRobots();
 	void commandRobots();
@@ -74,7 +88,12 @@ private:
 	map<int, int> robotPositionsIdx;
 
 	ofxDatGui *gui;
+	ofxDatGuiLabel *stateLabel;
+	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
+	map<int, RobotGui> robotGuis;
     
     Map *currentMap;
+
 	MaproomState state;
+	float stateStartTime;
 };

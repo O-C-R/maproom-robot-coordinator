@@ -72,7 +72,9 @@ public:
 	bool commsUp();
 	bool cvDetected();
 	string stateString();
-    
+	string stateDescription();
+	string positionString();
+
     // Set robot commands
     void calibrate();
     void stop();
@@ -116,6 +118,7 @@ public:
 	// Received from CV
 	ofVec3f tvec, rvec;
 	float lastCameraUpdateTime;
+	float cvFramerate;
 
 	// Derived from CV
 	ofMatrix4x4 mat;

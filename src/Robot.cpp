@@ -77,6 +77,7 @@ Robot::Robot(int rId, int mId, const string &n) :
 	avgRot(0),
 	stateStartTime(0),
 	lastCameraUpdateTime(-1000),
+	cvFramerate(0),
 	lastHeartbeatTime(-1000),
 	targetLinePID(2500.0, 0, 0)
 {
@@ -120,6 +121,16 @@ void Robot::start() {
 	if (state != R_START) {
 		setState(R_START);
 	}
+}
+
+string Robot::stateDescription() {
+	return stateString() + " (" + (commsUp() ? "CONN" : "DISCONN") + " " + (cvDetected() ? "SEEN" : "HIDDEN") + ")";
+}
+
+string Robot::positionString() {
+	char buf[512];
+	sprintf(buf, "(%+07.1f, %+07.1f) @ %03.1f%c (%.1f fps)", avgPlanePos.x * 100.0, avgPlanePos.y * 100.0, avgRot, char(176), cvFramerate);
+	return buf;
 }
 
 string Robot::stateString() {
@@ -208,7 +219,9 @@ void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const o
 	avgRot += ofAngleDifferenceDegrees(avgRot, rot) * 0.1;
 	avgRot = constrainTo360(avgRot);
 
-	lastCameraUpdateTime = ofGetElapsedTimef();
+	const float framerate = 1.0 / dt;
+	cvFramerate += (framerate - cvFramerate) * 0.1;
+	lastCameraUpdateTime = now;
 }
 
 void Robot::gotHeartbeat() {

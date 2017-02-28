@@ -17,8 +17,6 @@ void ofApp::setup() {
 	ofSetVerticalSync(true);
 	ofSetBackgroundColor(0);
 
-	state = MR_STOPPED;
-
 	cam.setDistance(3);
 	cam.enableMouseInput();
 	cam.setTarget(ofVec3f(0.0));
@@ -59,29 +57,60 @@ void ofApp::setup() {
     
     // set up GUI
     gui = new ofxDatGui( ofxDatGuiAnchor::TOP_RIGHT );
+	gui->setTheme(new ofxDatGuiThemeMidnight());
+
     gui->addHeader("St. Louis Maproom Console", false);
-    gui->addBreak();
+	stateLabel = gui->addLabel(stateString());
+
+	startButton = gui->addButton("Start");
+	pauseButton = gui->addButton("Pause");
+	stopButton = gui->addButton("Stop");
+
+	startButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
+		setState(MR_RUNNING);
+	});
+	pauseButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
+		setState(MR_PAUSED);
+	});
+	stopButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
+		setState(MR_STOPPED);
+	});
+
+	gui->addBreak();
     
     for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
         int robotId = it->first;
         Robot &r = *it->second;
-        gui->addLabel("Robot ID: " + ofToString(r.id));
-        gui->addLabel("Robot Name: " + ofToString(r.name.c_str()));
-        gui->addToggle("Messages Enabled " + ofToString(r.id), true);
-        gui->addButton("Stop: " + ofToString(r.id));
-        gui->addButton("Start: " + ofToString(r.id));
-        gui->addButton("Calibrate: " + ofToString(r.id));
-        gui->addButton("Next Path: " + ofToString(r.id));
-        gui->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, r.rot);
-        gui->addButton("Rotate: " + ofToString(r.id));
-        gui->addButton("Start Drawing: " + ofToString(r.id));
-        gui->addBreak();
+		RobotGui &rGui = robotGuis[robotId];
+
+		rGui.folder = gui->addFolder(ofToString(r.name.c_str()) + " (" + ofToString(r.id) + ")", ofColor::white);
+		rGui.folder->expand();
+
+        rGui.stateLabel = rGui.folder->addLabel(r.stateDescription());
+		rGui.posLabel = rGui.folder->addLabel(r.positionString());
+        rGui.enableToggle = rGui.folder->addToggle("Enabled", true);
+        rGui.calibrateButton = rGui.folder->addButton("Calibrate");
+        rGui.advanceButton = rGui.folder->addButton("Skip path");
+        rGui.rotationAngleSlider = rGui.folder->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, r.rot);
+
+		rGui.enableToggle->onToggleEvent([&r](ofxDatGuiToggleEvent e)  {
+			r.enabled = e.checked;
+		});
+		rGui.calibrateButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
+			r.calibrate();
+		});
+		rGui.advanceButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
+			r.setState(R_DONE_DRAWING);
+		});
+		rGui.rotationAngleSlider->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+			r.targetRot = e.value;
+		});
+
+		gui->addBreak();
     }
     gui->addButton("Reload Map");
-    
-    gui->onToggleEvent(this, &ofApp::onToggleEvent);
-    gui->onButtonEvent(this, &ofApp::onButtonEvent);
-    gui->onSliderEvent(this, &ofApp::onSliderEvent);
+	gui->addFRM();
+
 
 	// Listen for messages from camera
 	oscReceiver.setup( PORT );
@@ -94,6 +123,8 @@ void ofApp::setup() {
     
     currentMap = new Map(MAP_W, MAP_H, OFFSET_X, OFFSET_Y);
     loadMap(currentFile);
+
+	setState(MR_STOPPED);
 }
 
 void ofApp::exit() {
@@ -104,11 +135,26 @@ void ofApp::exit() {
 	}
 }
 
+void ofApp::setState(MaproomState newState) {
+	startButton->setEnabled(newState != MR_RUNNING);
+	pauseButton->setEnabled(newState != MR_PAUSED);
+	stopButton->setEnabled(newState != MR_STOPPED);
+
+	static const ofColor enabled(50, 50, 100), disabled(50, 50, 50);
+	startButton->setBackgroundColor(newState == MR_RUNNING ? enabled : disabled);
+	pauseButton->setBackgroundColor(newState == MR_PAUSED ? enabled : disabled);
+	stopButton->setBackgroundColor(newState == MR_STOPPED ? enabled : disabled);
+
+	state = newState;
+	stateStartTime = ofGetElapsedTimef();
+}
+
 //--------------------------------------------------------------
 void ofApp::update(){
 	handleOSC();
 	receiveFromRobots();
 	commandRobots();
+	updateGui();
 }
 
 void ofApp::receiveFromRobots() {
@@ -237,6 +283,15 @@ void ofApp::commandRobots() {
 		// Robot process its own loop.
 		r.update();
 
+		// Update robot gui
+		if (robotGuis.find(id) != robotGuis.end()) {
+			RobotGui &gui = robotGuis[id];
+
+			gui.stateLabel->setLabel(r.stateDescription());
+			gui.posLabel->setLabel(r.positionString());
+		}
+
+
 		// Record robot location
 		if (robotPositionsCount.find(id) == robotPositionsCount.end()) {
 			robotPositions[id].reserve(1000);
@@ -249,6 +304,12 @@ void ofApp::commandRobots() {
 		}
 		robotPositionsIdx[id] = (robotPositionsIdx[id] + 1) % 1000;
 	}
+}
+
+void ofApp::updateGui() {
+	char buf[1024];
+	sprintf(buf, "%s (%.2f)", stateString().c_str(), ofGetElapsedTimef() - stateStartTime);
+	stateLabel->setLabel(buf);
 }
 
 void ofApp::loadNextPath(Robot* r) {
@@ -264,6 +325,19 @@ void ofApp::loadNextPath(Robot* r) {
 //        pathsDrawn.push_back(nextPath);
 //    }
 //    r->startNavigation(nextPath.segment.start, nextPath.segment.end);
+}
+
+string ofApp::stateString() {
+	switch(state) {
+		case MR_STOPPED:
+			return "MR_STOPPED";
+		case MR_RUNNING:
+			return "MR_RUNNING";
+		case MR_PAUSED:
+			return "MR_PAUSED";
+		default:
+			return "UNKNOWN_STATE";
+	}
 }
 
 //--------------------------------------------------------------
@@ -284,25 +358,25 @@ void ofApp::draw(){
 		default:
 			maproomStateStr = "UNKNOWN_STATE";
 	}
-	sprintf(buf, "Maproom: %s", maproomStateStr.c_str());
-	posstr << buf << endl;
+//	sprintf(buf, "Maproom: %s", maproomStateStr.c_str());
+//	posstr << buf << endl;
 
 	cam.begin();
 
 	ofSetColor(255);
-	ofDrawAxis(10.0);
+	ofDrawAxis(1.0);
 
-	{
-		ofPushMatrix();
-		ofPushStyle();
-		ofVec3f pos = ofVec3f(0.0) * cameraToWorld;
-		ofSetColor(255, 255, 255);
-        ofNoFill();
-		ofDrawIcoSphere(pos, 0.02);
-		ofPopStyle();
-		ofPopMatrix();
-	}
-    
+//	{
+//		ofPushMatrix();
+//		ofPushStyle();
+//		ofVec3f pos = ofVec3f(0.0) * cameraToWorld;
+//		ofSetColor(255, 255, 255);
+//        ofNoFill();
+//		ofDrawIcoSphere(pos, 0.02);
+//		ofPopStyle();
+//		ofPopMatrix();
+//	}
+
     // offset projection
     ofVec3f corner1(-kMarkerSizeM/2.0, -kMarkerSizeM/2.0),
     corner2(kMarkerSizeM/2.0, kMarkerSizeM/2.0, 0.0),
@@ -357,15 +431,15 @@ void ofApp::draw(){
         ofDrawLine(r.startPlanePos, r.targetPlanePos);
         
 		// Debug output
-		sprintf(buf, "%d - %s %s %s - posCm = (%+07.1f, %+07.1f) - rotDeg = %03.1f (%s)",
-            r.id,
-			r.stateString().c_str(),
-            r.commsUp() ? "CONNECTED" : "DISCONNECTED",
-            r.cvDetected() ? "SEEN" : "HIDDEN",
-            r.avgPlanePos.x * 100.0, r.avgPlanePos.y * 100.0,
-            r.avgRot,
-            r.name.c_str());
-		posstr << buf << endl;
+//		sprintf(buf, "%d - %s %s %s - posCm = (%+07.1f, %+07.1f) - rotDeg = %03.1f (%s)",
+//            r.id,
+//			r.stateString().c_str(),
+//            r.commsUp() ? "CONNECTED" : "DISCONNECTED",
+//            r.cvDetected() ? "SEEN" : "HIDDEN",
+//            r.avgPlanePos.x * 100.0, r.avgPlanePos.y * 100.0,
+//            r.avgRot,
+//            r.name.c_str());
+//		posstr << buf << endl;
 
 		ofVec3f c1 = corner1 * r.mat;
 		ofVec3f c2 = corner2 * r.mat;
@@ -446,7 +520,7 @@ void ofApp::draw(){
 	ofDrawBitmapString(posstr.str(), 10, 15);
 }
 
-void ofApp::loadMap(string mapName) {
+void ofApp::loadMap(const string &mapName) {
     currentMap->loadMap(mapName);
     
     for (auto &p : robotsById) {
@@ -517,11 +591,11 @@ void ofApp::onSliderEvent(ofxDatGuiSliderEvent e)
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
 	if (key == 'g') {
-		state = MR_RUNNING;
+		setState(MR_RUNNING);
 	} else if (key == ' ') {
-		state = MR_PAUSED;
+		setState(MR_PAUSED);
 	} else if (key == 'x') {
-		state = MR_STOPPED;
+		setState(MR_STOPPED);
 	}
 }
 
