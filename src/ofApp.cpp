@@ -1,5 +1,7 @@
 #include "ofApp.h"
 
+static const bool debugging = true;
+
 //static const string currentFile = "maproom-2017-02-26T04-23-37.025Z.svg";
 static const string currentFile = "test_case.svg";
 static const float kMarkerSize = 0.2032f;
@@ -91,24 +93,6 @@ void ofApp::setup() {
         rGui.stateLabel = rGui.folder->addLabel(r.stateDescription());
 		rGui.posLabel = rGui.folder->addLabel(r.positionString());
 		rGui.lastMessageLabel = rGui.folder->addLabel("");
-        rGui.enableToggle = rGui.folder->addToggle("Enabled", true);
-        rGui.calibrateButton = rGui.folder->addButton("Calibrate");
-        rGui.advanceButton = rGui.folder->addButton("Skip path");
-        rGui.rotationAngleSlider = rGui.folder->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, r.rot);
-
-		rGui.enableToggle->onToggleEvent([&r](ofxDatGuiToggleEvent e)  {
-			r.enabled = e.checked;
-		});
-		rGui.calibrateButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
-			r.calibrate();
-		});
-		rGui.advanceButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
-			r.setState(R_DONE_DRAWING);
-		});
-		rGui.rotationAngleSlider->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.targetRot = e.value;
-		});
-
 		rGui.folder->addBreak();
 
 		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
@@ -312,7 +296,11 @@ void ofApp::commandRobots() {
 				} else {
 					mp->drawn = true;
 					robotPaths.erase(id);
-
+                    if (debugging) {
+                        r.planePos = mp->segment.end;
+                        r.avgPlanePos = mp->segment.end;
+                        r.slowAvgPlanePos = mp->segment.end;
+                    }
 					// TODO: make this a function on robot specifically
 					r.setState(R_READY_TO_POSITION);
 				}
@@ -329,6 +317,7 @@ void ofApp::commandRobots() {
 			gui.stateLabel->setLabel(r.stateDescription());
 			gui.posLabel->setLabel(r.positionString());
 			gui.lastMessageLabel->setLabel(r.lastMessage.length() > 0 ? r.lastMessage : "Unknown");
+
 		}
 
 
@@ -465,7 +454,7 @@ void ofApp::draw(){
 		Robot &r = *it->second;
 
         // draw current path for the robot:
-		if (r.state == R_DRAWING) {
+		if (r.state == R_DRAWING || debugging) {
 			ofSetColor(255, 255, 0);
 		} else {
 			ofSetColor(0, 0, 255);
