@@ -129,9 +129,6 @@ public:
 
 	// debug: visualizing states
 	ofVec2f dirToLine, backToLine, vecToEnd, movement;
-
-    // debug robots
-    bool debugPos;
 };
 
 #endif
