@@ -11,25 +11,25 @@
 
 #include "ofMain.h"
 #include "ofxUDPManager.h"
+#include "MiniPID.h"
 
 static const float kMetersPerInch = 0.0254;
 static const float kMarkerSizeIn = 5.0;
 static const float kMarkerSizeM = kMarkerSizeIn * kMetersPerInch;
 
 typedef enum RobotState {
+	R_NO_CONN,
 	R_START,
 	R_CALIBRATING_ANGLE,
 	R_ROTATING_TO_ANGLE,
 	R_WAITING_ANGLE,
+	R_READY_TO_POSITION,
 	R_POSITIONING,
     R_WAIT_AFTER_POSITION,
-    R_ROTATING_TO_DRAW,
-    R_WAITING_DRAW_ANGLE,
-    R_WAITING_TO_DRAW,
+    R_READY_TO_DRAW,
 	R_DRAWING,
     R_DONE_DRAWING,
-	R_STOPPED,
-	R_NO_CONN
+	R_STOPPED
 } RobotState;
 
 typedef enum PenState {
@@ -37,9 +37,6 @@ typedef enum PenState {
 	P_UP,
 	P_DOWN
 } PenState;
-
-// -> isWaiting -> movingToStart -> inPosition -> isDrawing -> isWaiting
-// sometimes -> isDrawing -> inPosition -> isDrawing (make sure not to lift pen up)
 
 typedef struct NavigationState {
     int pathType;
@@ -51,30 +48,67 @@ typedef struct NavigationState {
 class Robot {
 
 public:
+	Robot(int rId, int mId, const string &n);
+
+	// Setup communication - must be called before sending any messages
+	void setCommunication(const string &rIp, int rPort);
+	void sendMessage(const string &message);
+	void sendHeartbeat();
+	void gotHeartbeat();
+
+	// Update from CV
+	void updateCamera(const ofVec3f &rvec, const ofVec3f &tvec, const ofMatrix3x3 &rmat, const ofMatrix4x4 &cameraWorldInv);
+
+	// Update during loop
+	void update();
+	void setState(RobotState newState);
+
+	// States
+	void moveRobot(char *msg, bool drawing, bool &shouldSend);
+    bool inPosition(const ofVec2f &pos);
+	bool atRotation();
+
+	// Query robot state
+	bool commsUp();
+	bool cvDetected();
+	string stateString();
+	string stateDescription();
+	string positionString();
+
+    // Set robot commands
+    void calibrate();
+    void stop();
+    void start();
+    
+    // nav states
+	void navigateTo(const ofVec2f &target);
+    void drawLine(const ofVec2f &start, const ofVec2f &end);
+    
+    // test commands
+    void testRotate(float angle);
+    void testMove(float direction, float magnitude);
+
+// --------------------------------------
+// -------------- DATA ------------------
+// --------------------------------------
+
 	// Required
 	int id;
 	string name;
 	int markerId;
-    ofColor color;
-    
+
 	// State machine
 	RobotState state;
-	PenState penState;
-    NavigationState navState;
 	float stateStartTime;
-	int positionIdx;
 
 	// Targets
 	float targetRot;
-	ofVec2f targetPlanePos;
-    
-    // values to send
-    float moveDir;
-    float moveMag;
+	ofVec2f startPlanePos, targetPlanePos;
+	MiniPID targetLinePID;
 
 	// Communication
-    bool enableMessages;
-    string ip;
+	bool enabled;
+	string ip;
 	int port;
 	ofxUDPManager socket;
 	string lastMessage;
@@ -84,81 +118,17 @@ public:
 	// Received from CV
 	ofVec3f tvec, rvec;
 	float lastCameraUpdateTime;
+	float cvFramerate;
 
 	// Derived from CV
 	ofMatrix4x4 mat;
 	ofVec3f worldPos;
-    ofVec2f planePos, avgPlanePos, slowAvgPlanePos;
-	float rot;
-    
-    // navigation
-    ofVec2f targetPos;
-    bool getInitial;
-    
-	Robot(int rId, int mId, const string &n, ofColor color) :
-		id(rId),
-		markerId(mId),
-		name(n),
-        color(color),
-		state(R_NO_CONN),
-        enableMessages(false),
-		penState(P_UNKNOWN),
-        planePos(0, 0),
-        avgPlanePos(0, 0),
-        slowAvgPlanePos(0, 0),
-		targetRot(120),
-		targetPlanePos(0, 0),
-		stateStartTime(0),
-		lastCameraUpdateTime(-1000),
-		lastHeartbeatTime(-1000),
-		positionIdx(0),
-        getInitial(true),
-        debugPos(false)
-	{}
+	ofVec2f planePos, avgPlanePos, slowAvgPlanePos, allAvgPlanePos;
+	ofVec2f planeVel, avgPlaneVel;
+	float rot, avgRot;
 
-	// Setup communication - must be called before sending any messages
-	void setCommunication(const string &rIp, int rPort);
-	void sendMessage(const string &message);
-	void sendHeartbeat();
-	void gotHeartbeat();
-
-	// Update from CV
-	void updateCamera(const ofVec3f &rvec, const ofVec3f &tvec, const ofMatrix4x4 &cameraWorldInv);
-
-	// Update during loop
-	void update();
-	void setState(RobotState newState);
-
-	// States
-	void moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend);
-    bool inPosition(ofVec2f target);
-    void rotateToDraw(char *msg, ofVec2f target, bool &shouldSend);
-
-	// Query robot state
-	bool commsUp();
-	bool cvDetected();
-    
-    // Set robot commands
-    void calibrate();
-    void stop();
-    void start();
-    
-    // nav states
-    void setPathType(int pathType);
-    void startNavigation(ofVec2f start, ofVec2f end);
-    bool setRotating;
-    ofVec2f lastPos;
-    bool repositioned;
-    
-    // test commands
-    void testRotate(float angle);
-    void testMove(float direction, float magnitude);
-    
-    // visualizing states
-    float idealRad;
-    float counterRad;
-    float dist;
-    float headingRad;
+	// debug: visualizing states
+	ofVec2f dirToLine, backToLine, vecToEnd, movement;
 
     // debug robots
     bool debugPos;

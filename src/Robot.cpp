@@ -8,32 +8,14 @@
 
 #include "Robot.h"
 
-static const float kTolerance = 0.01f;
+static const float kPositionTolerance = 0.005f;
+static const float kRotationTolerance = 3.0f;
 
 static const float kHeartbeatTimeoutSec = 2.0f;
 static const float kCameraTimeoutSec = 1.0f;
 
-static const float kPenMovementTime = 0.1f;
-
 static const float kCalibrationWaitSec = 0.25f;
 static const float kAngleWaitSec = 2.0f;
-
-static const float kMoveWaitSec = 2.0f;
-
-static const float kRotationToleranceStart = 10.0f;
-static const float kRotationToleranceFinal = 3.0f;
-
-const static float kSqSizeM = 0.25;
-const static int kNumPositions = 5;
-
-const static ofVec2f positions[] = {
-	{ 0.0, 0.0 },
-	{ -kSqSizeM, -kSqSizeM },
-	{  kSqSizeM, -kSqSizeM },
-	{  kSqSizeM,  kSqSizeM },
-	{ -kSqSizeM,  kSqSizeM },
-	{ 0.0, 0.0 }
-};
 
 void cmdCalibrateAngle(char *buf, int measured) {
 	sprintf(buf, "MRCAL%+06d\n", measured);
@@ -53,6 +35,53 @@ void cmdDraw(char *buf, int angle, int magnitude, int measured) {
 
 void cmdStop(char *buf, bool penDown) {
     sprintf(buf, "MRSTP%d\n", penDown ? 1 : 0);
+}
+
+void cmdStop(char * buf) {
+	cmdStop(buf, false);
+}
+
+inline ofVec2f vecPtToLine(const ofVec2f &pt, const ofVec2f &l1, const ofVec2f &l2) {
+	const ofVec2f dir = (l2 - l1).normalize();
+	const ofVec2f a = pt - l1;
+	return (l1 + (pt - l1).dot(dir) * dir) - pt;
+}
+
+inline float constrainTo360(const float deg) {
+	return fmod(deg + 360.0f, 360.0f);
+}
+
+inline float ofRadToRobotDeg(const float rad) {
+	return fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
+}
+
+inline float robotDegToOfRad(const float deg) {
+	return ofDegToRad(deg + 90);
+}
+
+Robot::Robot(int rId, int mId, const string &n) :
+	id(rId),
+	markerId(mId),
+	name(n),
+	state(R_NO_CONN),
+	enabled(true),
+	planePos(0, 0),
+	avgPlanePos(0, 0),
+	slowAvgPlanePos(0, 0),
+	allAvgPlanePos(0, 0),
+	planeVel(0, 0),
+	avgPlaneVel(0, 0),
+	targetRot(0),
+	targetPlanePos(0, 0),
+	rot(0),
+	avgRot(0),
+	stateStartTime(0),
+	lastCameraUpdateTime(-1000),
+	cvFramerate(0),
+	lastHeartbeatTime(-1000),
+	targetLinePID(3200.0, 7, 700)
+{
+	targetLinePID.setMaxIOutput(500.0);
 }
 
 void Robot::setCommunication(const string &rIp, int rPort) {
@@ -79,42 +108,74 @@ void Robot::calibrate() {
 }
 
 void Robot::stop() {
-    setState(R_STOPPED);
-    cmdStop(msg, (penState == P_UP ? true : false));
-	sendMessage(msg);
+	if (state != R_STOPPED) {
+		setState(R_STOPPED);
+	}
 }
 
 void Robot::start() {
-    setState(R_START);
+	if (state != R_START) {
+		setState(R_START);
+	}
 }
 
-void Robot::testRotate(float angle) {
-    targetRot = angle;
-    setState(R_ROTATING_TO_ANGLE);
-	cmdRot(msg, angle, rot);
-	sendMessage(msg);
+string Robot::stateDescription() {
+	return stateString() + " (" + (commsUp() ? "CONN" : "DISCONN") + " " + (cvDetected() ? "SEEN" : "HIDDEN") + ")";
 }
 
-void Robot::testMove(float direction, float magnitude) {
-    moveDir = direction;
-    moveMag = magnitude;
-//    setState(R_MOVING);
-
-	cmdMove(msg, direction, magnitude, rot);
-	sendMessage(msg);
+string Robot::positionString() {
+	char buf[512];
+	sprintf(buf, "(%+07.1f, %+07.1f, %+07.1f) @ %03.1f%c (%.1f fps)",
+			avgPlanePos.x * 100.0, avgPlanePos.y * 100.0,
+			mat.getTranslation().z * 100.0,
+			avgRot, char(176),
+			cvFramerate);
+	return buf;
 }
 
+string Robot::stateString() {
+	switch(state) {
+		case R_START:
+			return "R_START";
+		case R_CALIBRATING_ANGLE:
+			return "R_CALIBRATING_ANGLE";
+		case R_ROTATING_TO_ANGLE:
+			return "ROTATING_TO_ANGLE";
+		case R_WAITING_ANGLE:
+			return "R_WAITING_ANGLE";
+		case R_READY_TO_POSITION:
+			return "R_READY_TO_POSITION";
+		case R_POSITIONING:
+			return "R_POSITIONING";
+		case R_WAIT_AFTER_POSITION:
+			return "R_WAIT_AFTER_POSITION";
+		case R_READY_TO_DRAW:
+			return "R_WAITING_TO_DRAW";
+		case R_DRAWING:
+			return "R_DRAWING";
+		case R_DONE_DRAWING:
+			return "R_DONE_DRAWING";
+		case R_STOPPED:
+			return "R_STOPPED";
+		case R_NO_CONN:
+			return "R_NO_CONN";
+		default:
+			return "UNKNOWN_STATE";
+	}
+}
 
-void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix4x4 &cameraWorldInv) {
+// TODO: fix this math somehow
+void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix3x3 &rmat, const ofMatrix4x4 &cameraWorldInv) {
 	rvec = newRvec;
 	tvec = newTvec;
 
+	// Convert from Rodrigues formulation of rotation matrix
 	// http://answers.opencv.org/question/110441/use-rotation-vector-from-aruco-in-unity3d/
 	float angle = sqrt(rvec.x*rvec.x + rvec.y*rvec.y + rvec.z*rvec.z);
 	ofVec3f axis(rvec.x, rvec.y, rvec.z);
 
 	ofQuaternion rvecQuat;
-	rvecQuat.makeRotate(angle / 3.14159 * 180.0, axis);
+	rvecQuat.makeRotate(ofRadToDeg(angle), axis);
 
 	mat.makeIdentityMatrix();
 	mat.setRotate(rvecQuat);
@@ -124,21 +185,44 @@ void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const o
 	// Get position in world
 	worldPos = mat.getTranslation();
 
-	// Translate to the center of the marker
-    
-    planePos.set(worldPos.x, worldPos.y);
-    avgPlanePos += (planePos - avgPlanePos) * 0.25;
-    slowAvgPlanePos += (planePos - slowAvgPlanePos) * 0.075;
-    
+	// Calculate plane positions, smoothed over time.
+	ofVec2f newPlanePos(worldPos.x, worldPos.y);
+	allAvgPlanePos += (newPlanePos - allAvgPlanePos) * 0.5;
+
+	// Skip outliers
+	if (newPlanePos.distance(allAvgPlanePos) > 0.01) {
+		return;
+	}
+
+	const float now = ofGetElapsedTimef();
+	const float dt = now - lastCameraUpdateTime;
+
+	// Calculate delta velocity first
+	if (dt > 0) {
+		planeVel = (newPlanePos - planePos) / dt;
+		avgPlaneVel += (avgPlaneVel - planeVel) * 0.25;
+	}
+
+	// Update positions and previous averages
+	planePos.set(newPlanePos);
+	avgPlanePos += (planePos - avgPlanePos) * 0.25;
+	slowAvgPlanePos += (planePos - slowAvgPlanePos) * 0.075;
+
 	// Get z-axis rotation
-	ofVec3f angAxis = ofVec3f(0.0, 1.0, 0.0) * mat;
+	// Rotation is right-handed, and goes from 0-360 starting on the +x axis
+	static const ofVec3f upVec(0.0, 1.0, 0.0);
+	ofVec3f angAxis = upVec * mat;
 	ofVec2f axisVec = ofVec2f(angAxis.x, angAxis.y) - ofVec2f(worldPos.x, worldPos.y);
 	float axisAngle = atan2(axisVec.y, axisVec.x);
 
-	// rotation is right-handed, and goes from 0-360 starting on the +x axis
-	rot = fmod(ofRadToDeg(axisAngle) + 360 - 90, 360.0);
+	// Translate rotation into robot coordinates
+	rot = ofRadToRobotDeg(axisAngle);
+	avgRot += ofAngleDifferenceDegrees(avgRot, rot) * 0.1;
+	avgRot = constrainTo360(avgRot);
 
-	lastCameraUpdateTime = ofGetElapsedTimef();
+	const float framerate = 1.0 / dt;
+	cvFramerate += (framerate - cvFramerate) * 0.1;
+	lastCameraUpdateTime = now;
 }
 
 void Robot::gotHeartbeat() {
@@ -147,7 +231,7 @@ void Robot::gotHeartbeat() {
 
 bool Robot::commsUp() {
     return true;
-	return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
+//	return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
 }
 
 bool Robot::cvDetected() {
@@ -155,153 +239,105 @@ bool Robot::cvDetected() {
 }
 
 void Robot::setState(RobotState newState) {
-	cout << "State change " << state << " to " << newState << endl;
+	cout << "State change " << stateString() << " -> ";
 	state = newState;
+	cout << stateString() << endl;
+
 	stateStartTime = ofGetElapsedTimef();
 }
 
-void Robot::rotateToDraw(char *msg, ofVec2f target, bool &shouldSend) {
-    ofVec2f dir = navState.end - navState.start;
-//    dir.normalize();
-    float rad = atan2(dir.y, dir.x);
-    float heading = fmod(ofRadToDeg(rad) + 360, 360.0);
-    
-    // given heading, where do we rotate?
-//    float idealOffset = fmod(heading - rot, 120.0);
-//    float newAngle;
-//    if (heading > rot) {
-//        newAngle = fmod(rot - idealOffset, 360.0);
-//    } else {
-//        newAngle = fmod(rot + idealOffset, 360.0);
-//    }
-//    cout << "new angle: " << newAngle << endl;
-    targetRot = heading;
-    cout << "targetRot: " << targetRot << endl;
-    shouldSend = true;
-}
+void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
+	// Vectors for movement - ideal and remaining
+    const ofVec2f line = targetPlanePos - startPlanePos;
+	ofVec2f currentToEnd = targetPlanePos - planePos;
 
-void Robot::moveRobot(char *msg, ofVec2f target, bool drawing, bool &shouldSend) {
-    ofVec2f line = navState.end - navState.start;
+	// Calculate where and how fast we'd go to just get to the end
+	const float distanceToEnd = currentToEnd.length();
+	float forwardMag = ofMap(distanceToEnd, 0, 1, 50, 250, true);
+	const ofVec2f currentToEndDir = (line.dot(currentToEnd) / line.lengthSquared() * line).normalize();
+	vecToEnd = currentToEndDir * forwardMag;
 
-    ofVec2f startToCurrent = planePos - navState.start;
-	ofVec2f currentToEnd = target - planePos;
-    
-    ofVec2f startToAvg = avgPlanePos - navState.start;
-    ofVec2f avgToEnd = navState.end - slowAvgPlanePos;
-    
-    ofVec2f actualDir = avgPlanePos - slowAvgPlanePos;
-    dist = actualDir.length();
-    
-	float distToTarget = currentToEnd.length();
-    float distFromStart = startToCurrent.length();
-    
-    line.normalize();
-    startToCurrent.normalize();
-    currentToEnd.normalize();
-    
-    actualDir.normalize();
-    avgToEnd.normalize();
-    
-    float actualRad = atan2(actualDir.y, actualDir.x);
-    float avgToEndRad = atan2(avgToEnd.y, avgToEnd.x);
-    float actualDeg = fmod(ofRadToDeg(actualRad) + 360 - 90, 360.0);
-    float avgToEndDeg = fmod(ofRadToDeg(avgToEndRad) + 360 - 90, 360.0);
-    
-    float actualAngleDiffDeg = ofAngleDifferenceDegrees(avgToEndDeg, actualDeg);
-    float whereShouldIReallyGo = fmod(avgToEndDeg - actualAngleDiffDeg + 360.0, 360.0);
-    counterRad = ofDegToRad(whereShouldIReallyGo + 90);
-    
-    idealRad = ofDegToRad(actualDeg + 90);
-    
-//    ofVec2f targetMinusActual = avgToEnd
-    
-    float angle, idealAngle, angleDiff, finalAngle;
-//
-    {
-        float rad = atan2(currentToEnd.y, currentToEnd.x);
-        angle = fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
-        headingRad = rad;
-    }
-    
-    if (dist < 0.01f) {
-        whereShouldIReallyGo = angle;
-    }
-//
-//    {
-//        line = avgToEnd;
-//        
-//        idealRad = atan2(line.y, line.x);
-//        idealAngle = fmod(ofRadToDeg(idealRad) + 360 - 90, 360.0);
-//    }
-//
-//    angleDiff = idealAngle - angle;
-//    finalAngle = fmod(angle - angleDiff + 360, 360.0);
-//    counterRad = ofDegToRad(finalAngle + 90);
-    
-    float mag = ofMap(distToTarget, 0, 1, 70, 250, true);
-    if (drawing) {
-        cout << "DRAWING" << endl;
-        cmdDraw(msg, whereShouldIReallyGo, mag, rot);
+	// Calculate how far we are from the line and how we should correct for that
+	dirToLine = vecPtToLine(planePos, startPlanePos, targetPlanePos);
+	const float distToLine = dirToLine.length();
+	const double targetLinePIDOutput = targetLinePID.getOutput(distToLine, 0.0);
+	backToLine = targetLinePIDOutput * ofVec2f(dirToLine).normalize() * -1.0;
+	backToLine *= ofMap(distanceToEnd, 0, 1, 0.5, 2.0, true);
+
+	// Combine the two vectors
+	movement = (vecToEnd + backToLine).normalize() * forwardMag;
+	float angle = ofRadToRobotDeg(atan2(movement.y, movement.x));
+	const float mag = movement.length();
+
+	if (distanceToEnd < 0.02f) {
+		// If we're really close to the end, just get there.
+		currentToEnd.normalize();
+		angle = ofRadToRobotDeg(atan2(currentToEnd.y, currentToEnd.x));
+	}
+
+	// Send message
+	if (drawing) {
+		cmdDraw(msg, angle, mag, rot);
+		shouldSend = true;
     } else {
-        cout << "MOVING" << endl;
         cmdMove(msg, angle, mag, rot);
+		shouldSend = true;
     }
-    
-	shouldSend = true;
-	cout << planePos << endl;
-	cout << target << endl;
-	cout << msg << endl;
 }
 
-bool Robot::inPosition(ofVec2f target) {
-    ofVec2f dir = target - avgPlanePos;
-    float len = dir.length();
-    return (len < kTolerance ? true : false);
+bool Robot::atRotation() {
+	return abs(ofAngleDifferenceDegrees(targetRot, avgRot)) < kRotationTolerance;
 }
 
-void Robot::setPathType(int pathType) {
-    navState.pathType = pathType;
+bool Robot::inPosition(const ofVec2f &pos) {
+	return targetPlanePos.distance(pos) < kPositionTolerance;
 }
 
-void Robot::startNavigation(ofVec2f start, ofVec2f end) {
-    navState.start = start;
-    navState.end = end;
-    repositioned = false;
+void Robot::navigateTo(const ofVec2f &target) {
+	startPlanePos = avgPlanePos;
+	targetPlanePos = target;
+	targetLinePID.reset();
+
     setState(R_POSITIONING);
 }
 
+void Robot::drawLine(const ofVec2f &start, const ofVec2f &end) {
+	startPlanePos = start;
+	targetPlanePos = end;
+	targetLinePID.reset();
+
+	setState(R_DRAWING);
+}
+
 void Robot::update() {
-	bool shouldSend = false;
-
-	float elapsedStateTime = ofGetElapsedTimef() - stateStartTime;
-	float rotAngleDiff = ofAngleDifferenceDegrees(targetRot, rot);
-
-	if (!enableMessages) {
+	if (!enabled) {
 		return;
 	}
 
-//	if (!commsUp()) {
-//		if (state != R_NO_CONN) {
-//			cout << "Comms down, moving to NO_CONN" << endl;
-//			setState(R_NO_CONN);
-//		}
-//
-//		cmdStop(msg, false);
-//		shouldSend = true;
-//	} else
-    if (!cvDetected()) {
+	bool shouldSend = false, mustSend = false;
+	const float elapsedStateTime = ofGetElapsedTimef() - stateStartTime;
+
+	if (!commsUp()) {
+		if (state != R_NO_CONN) {
+			cout << "Comms down, moving to NO_CONN" << endl;
+			setState(R_NO_CONN);
+		}
+
+		cmdStop(msg);
+		shouldSend = true;
+	} else if (!cvDetected()) {
 		if (state != R_NO_CONN) {
 			cout << "CV down, moving to NO_CONN" << endl;
 			setState(R_NO_CONN);
 		}
 
-		cmdStop(msg, false);
+		cmdStop(msg);
 		shouldSend = true;
 	} else if (state == R_NO_CONN) {
 		// Now connected and seen!
 		setState(R_START);
 
-		cmdStop(msg, false);
+		cmdStop(msg);
 		shouldSend = true;
 	} else if (state == R_START) {
 		// If we're started, immediately calibrate the angle
@@ -310,19 +346,28 @@ void Robot::update() {
 	} else if (state == R_CALIBRATING_ANGLE) {
 		// We're calibrating the angle for a bit
 
-		cmdCalibrateAngle(msg, rot);
-		shouldSend = true;
-        
-		if (elapsedStateTime >= kCalibrationWaitSec) {
+		if (elapsedStateTime < 0.5f) {
+			cmdStop(msg);
+			shouldSend = true;
+		} else if (elapsedStateTime >= 3.0f) {
 			// We've calibrated enough
-            setState(R_POSITIONING);
+            setState(R_ROTATING_TO_ANGLE);
+		} else {
+			cmdCalibrateAngle(msg, avgRot);
+			shouldSend = true;
 		}
     } else if (state == R_ROTATING_TO_ANGLE) {
 		// We're rotating to a target angle
 
-		if (abs(rotAngleDiff) > kRotationToleranceFinal) {
+		if (elapsedStateTime > 5.0f) {
+			// Failsafe - don't get stuck here.
+			cmdStop(msg);
+			shouldSend = true;
+
+			setState(R_CALIBRATING_ANGLE);
+		} else if (!atRotation()) {
 			// Too far from angle, keep moving.
-			cmdRot(msg, targetRot, rot);
+			cmdRot(msg, targetRot, avgRot);
 			shouldSend = true;
 		} else {
 			// Close enough to angle, wait to see if the robot stays close enough.
@@ -331,125 +376,65 @@ void Robot::update() {
 	} else if (state == R_WAITING_ANGLE) {
 		// We're waiting after issuing rotate commands
 
-		if (elapsedStateTime < kAngleWaitSec) {
-			// Pass
-		} else if (abs(rotAngleDiff) > kRotationToleranceFinal) {
-			// We're out of tolerance, try rotating again.
-			setState(R_ROTATING_TO_ANGLE);
+		if (elapsedStateTime > 1.0f && !atRotation()) {
+			// We're out of tolerance, try calibrating again.
+			setState(R_CALIBRATING_ANGLE);
 		} else if (elapsedStateTime > kAngleWaitSec) {
-			// We've waited long enough, stop.
-			setState(R_STOPPED);
-
+			// We've waited long enough, let's move on to positioning.
 			cmdStop(msg, false);
 			shouldSend = true;
+
+			setState(R_READY_TO_POSITION);
 		}
+	} else if (state == R_READY_TO_POSITION) {
+		// Pass - wait for controller to give the go-ahead.
+		cmdStop(msg, false);
+		shouldSend = true;
     } else if (state == R_POSITIONING) {
-        cout << "STATE POSITIONING" << endl;
         // move in direction at magnitude
-        if (inPosition(navState.start)) {
-            cmdStop(msg, !repositioned);
-            shouldSend = true;
+        if (inPosition(planePos)) {
+            cmdStop(msg, false);
+            mustSend = true;
             setState(R_WAIT_AFTER_POSITION);
         } else {
-            repositioned = true;
             // move is different from draw
-            moveRobot(msg, navState.start, false, shouldSend);
+            moveRobot(msg, false, shouldSend);
         }
     } else if (state == R_WAIT_AFTER_POSITION) {
-        cout << "WAITING TO ROTATE" << endl;
-        cmdStop(msg, !repositioned);
+        cmdStop(msg);
         shouldSend = true;
-        if (!repositioned && !inPosition(navState.start)) {
-            // go right to waiting to draw
-            setState(R_WAITING_TO_DRAW);
-        } else if (elapsedStateTime > 0.10f) {
-            setState(R_WAITING_TO_DRAW);
-        } else if (!inPosition(navState.start)) {
+
+        if (elapsedStateTime > 0.5f && !inPosition(avgPlanePos)) {
+			// Go back, we're out of position.
             setState(R_POSITIONING);
+        } else if (elapsedStateTime > 1.5f) {
+			// We've waited long enough, start drawing.
+            setState(R_READY_TO_DRAW);
         }
-    } else if (state == R_ROTATING_TO_DRAW) {
-        cout << "ROTATING TO IDEAL ANGLE" << endl;
-        ofVec2f dir = navState.end - navState.start;
-        float rad = atan2(dir.y, dir.x);
-        float heading = fmod(ofRadToDeg(rad) + 360 + 90, 360.0);
-        targetRot = heading;
-        cout << "targetRot: " << targetRot << endl;
-        cmdRot(msg, targetRot, rot);
-        shouldSend = true;
-        rotAngleDiff = abs(fmod(ofAngleDifferenceDegrees(targetRot, rot), 360.0));
-        cout << "rotAngleDiff: " << rotAngleDiff << endl;
-        if (abs(rotAngleDiff) < kRotationToleranceStart) {
-//            cmdStop(msg, false);
-//            shouldSend = true;
-            setRotating = false;
-            setState(R_WAITING_DRAW_ANGLE);
-        }
-    }  else if (state == R_WAITING_DRAW_ANGLE) {
-        if (!setRotating) {
-            cmdRot(msg, targetRot, rot);
-            shouldSend = true;
-            setRotating = true;
-        }
-        cout << "WAITING FOR DRAW ANGLE" << endl;
-        rotAngleDiff = abs(fmod(ofAngleDifferenceDegrees(targetRot, rot), 360.0));
-        if (elapsedStateTime > 2.0f) {
-            if (abs(rotAngleDiff) < kRotationToleranceFinal) {
-                cmdStop(msg, false);
-                shouldSend = true;
-                setState(R_WAITING_TO_DRAW);
-            } else {
-                calibrate();
-                if (elapsedStateTime > 2.25f) {
-                    setState(R_ROTATING_TO_DRAW);
-                }
-            }
-        } else if (abs(rotAngleDiff) > kRotationToleranceStart) {
-            setState(R_ROTATING_TO_DRAW);
-        }
-    } else if (state == R_WAITING_TO_DRAW) {
-        cout << "WAITING TO DRAW" << endl;
-        // wait for okay to draw
-        if (navState.drawReady) {
-            if (!repositioned) {
-                setState(R_DRAWING);
-                navState.drawReady = false;
-            } else if (elapsedStateTime > 0.05f) {
-                setState(R_DRAWING);
-                navState.drawReady = false;
-            }
-        }
+    } else if (state == R_READY_TO_DRAW) {
+        // Pass - wait to be sent to drawing.
+		cmdStop(msg, false);
+		shouldSend = true;
     } else if (state == R_DRAWING) {
-        cout << "DRAWING" << endl;
-        if (inPosition(navState.end)) {
+        if (inPosition(planePos)) {
+			cmdStop(msg);
+			shouldSend = true;
+
             setState(R_DONE_DRAWING);
         } else {
-            moveRobot(msg, navState.end, true, shouldSend);
+            moveRobot(msg, true, shouldSend);
         }
     } else if (state == R_DONE_DRAWING) {
-        cout << "DONE DRAWING" << endl;
-        // we're stopped, pen is up
-        cmdStop(msg, !repositioned);
-        repositioned = false;
+        cmdStop(msg);
         shouldSend = true;
-        
-        if (!repositioned) {
-            navState.readyForNextPath = true;
-        } else if (elapsedStateTime > 0.25f) {
-			navState.readyForNextPath = true;
-		}
     } else if (state == R_STOPPED) {
-        cout << "STOPPED" << endl;
 		// We're stopped. Stop.
-		cmdStop(msg, false);
+		cmdStop(msg);
 		shouldSend = true;
 	}
 
-	if (shouldSend) {
-		shouldSend = ofGetFrameNum() % 4 == 0;
-	}
-
-	if (shouldSend && enableMessages) {
+	// Only send messages every so often to avoid hammering the Arduino.
+	if (mustSend || (shouldSend && ofGetFrameNum() % 6 == 0)) {
 		sendMessage(msg);
 	}
-    lastPos = planePos;
 }

@@ -22,10 +22,10 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
     
     // see if duplicate path exists already in store
     
-    MapPath toStore = {false, lineType, segment};
+    MapPath toStore = {false, false, lineType, segment};
     storeCount++;
     bool shouldStore = true;
-        if ((segment.end - segment.start).length() < 0.01f) {
+	if ((segment.end - segment.start).length() < 0.005f) {
         shouldStore = false;
     }
     for (auto &path : mapPathStore[lineType]) {
@@ -33,7 +33,7 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
             break;
         }
         
-        const float kEpsilon = 0.01; // 1mm
+        const float kEpsilon = 0.001; // 1mm
         if (path.segment.start.distance(segment.start) < kEpsilon && path.segment.end.distance(segment.end) < kEpsilon) {
             shouldStore = false;
         } else if (path.segment.end.distance(segment.start) < kEpsilon && path.segment.start.distance(segment.end) < kEpsilon) {
@@ -200,11 +200,8 @@ void Map::loadMap(const string filename) {
     currentMap.popTag();
 }
 
-
-bool Map::checkNextPath(const ofVec2f initial) {
-
-    MapPath *next;
-    bool foundNext;
+MapPath* Map::nextPath(const ofVec2f &pos) {
+    MapPath *next = NULL;
     float minDist = INFINITY;
     
     for (auto &path : pathTypes) {
@@ -213,20 +210,16 @@ bool Map::checkNextPath(const ofVec2f initial) {
         }
 
         for (auto &mapPath : mapPathStore[path]) {
-            if (mapPath.drawn) {
+            if (mapPath.claimed || mapPath.drawn) {
                 continue;
             }
             
-            ofVec2f startDir = mapPath.segment.start - initial;
-            ofVec2f endDir = mapPath.segment.end - initial;
-
-            float startDist = startDir.length();
-            float endDist = endDir.length();
+            float startDist = mapPath.segment.start.distance(pos);
+            float endDist = mapPath.segment.end.distance(pos);
             
             if (startDist < minDist) {
                 minDist = startDist;
                 next = &mapPath;
-                foundNext = true;
             } else if (endDist < minDist) {
                 ofVec2f tmp = mapPath.segment.start;
                 mapPath.segment.start = mapPath.segment.end;
@@ -234,63 +227,10 @@ bool Map::checkNextPath(const ofVec2f initial) {
 
                 minDist = endDist;
                 next = &mapPath;
-                foundNext = true;
             }
         }
     }
     
-    if (foundNext) {
-        next->drawn = true;
-        nextPath = *next;
-        return true;
-    } else {
-        return false;
-    }
-}
-
-bool Map::checkNextPath(ofVec2f initial, string pathType) {
-    MapPath *next;
-    bool foundNext;
-    float minDist = INFINITY;
-
-    
-    if (mapPathStore.find(pathType) != mapPathStore.end()) {
-        for (auto &mapPath : mapPathStore[pathType]) {
-            if (mapPath.drawn) {
-                continue;
-            }
-            
-            ofVec2f startDir = mapPath.segment.start - initial;
-            ofVec2f endDir = mapPath.segment.end - initial;
-            float startDist = startDir.length();
-            float endDist = endDir.length();
-            
-            if (startDist < minDist) {
-                minDist = startDist;
-                next = &mapPath;
-                foundNext = true;
-            } else if (endDist < minDist) {
-                ofVec2f tmp = mapPath.segment.start;
-                mapPath.segment.start = mapPath.segment.end;
-                mapPath.segment.end = tmp;
-                
-                minDist = endDist;
-                next = &mapPath;
-                foundNext = true;
-            }
-        }
-    }
-
-    if (foundNext) {
-        next->drawn = true;
-        nextPath = *next;
-        return true;
-    } else {
-        return false;
-    }
-}
-
-MapPath Map::getNextPath() {
-    return nextPath;
+	return next;
 }
 
