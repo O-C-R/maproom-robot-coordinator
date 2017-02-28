@@ -25,20 +25,20 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
     MapPath toStore = {false, false, lineType, segment};
     storeCount++;
     bool shouldStore = true;
-//	if ((segment.end - segment.start).length() < 0.01f) {
-//        shouldStore = false;
-//    }
+	if ((segment.end - segment.start).length() < 0.005f) {
+        shouldStore = false;
+    }
     for (auto &path : mapPathStore[lineType]) {
         if (!shouldStore) {
             break;
         }
         
-//        const float kEpsilon = 0.001; // 1mm
-//        if (path.segment.start.distance(segment.start) < kEpsilon && path.segment.end.distance(segment.end) < kEpsilon) {
-//            shouldStore = false;
-//        } else if (path.segment.end.distance(segment.start) < kEpsilon && path.segment.start.distance(segment.end) < kEpsilon) {
-//            shouldStore = false;
-//        }
+        const float kEpsilon = 0.001; // 1mm
+        if (path.segment.start.distance(segment.start) < kEpsilon && path.segment.end.distance(segment.end) < kEpsilon) {
+            shouldStore = false;
+        } else if (path.segment.end.distance(segment.start) < kEpsilon && path.segment.start.distance(segment.end) < kEpsilon) {
+            shouldStore = false;
+        }
     }
     if (shouldStore) {
 //        cout << "pathCount " << pathCount << " storeCount " << storeCount << endl;
@@ -210,7 +210,7 @@ MapPath* Map::nextPath(const ofVec2f &pos) {
         }
 
         for (auto &mapPath : mapPathStore[path]) {
-            if (mapPath.drawn) {
+            if (mapPath.claimed || mapPath.drawn) {
                 continue;
             }
             

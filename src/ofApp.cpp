@@ -303,11 +303,11 @@ void ofApp::draw(){
     for (auto &i : currentMap->mapPathStore) {
         for (auto &j : i.second) {
 			if (j.drawn) {
-				ofSetColor(150, 150, 150);
+				ofSetColor(255, 255, 255);
 			} else if (j.claimed) {
 				ofSetColor(200, 200, 0);
 			} else {
-				ofSetColor(90, 90, 90);
+				ofSetColor(50, 50, 50);
 			}
 
             ofDrawLine(j.segment.start, j.segment.end);

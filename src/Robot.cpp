@@ -240,7 +240,7 @@ void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 	// Calculate where and how fast we'd go to just get to the end
 	const float distanceToEnd = currentToEnd.length();
 	float forwardMag = ofMap(distanceToEnd, 0, 1, 50, 250, true);
-	const ofVec2f currentToEndDir = ofVec2f(currentToEnd).normalize();
+	const ofVec2f currentToEndDir = (line.dot(currentToEnd) / line.lengthSquared() * line).normalize();
 	vecToEnd = currentToEndDir * forwardMag;
 
 	// Calculate how far we are from the line and how we should correct for that
