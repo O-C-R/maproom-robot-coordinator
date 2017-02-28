@@ -47,8 +47,10 @@ class ofApp : public ofBaseApp{
 	void receiveFromRobots();
 	void commandRobots();
     
-    void loadMap(string name);
+    void loadMap(const string &name);
     void loadNextPath(Robot* r);
+
+	void unclaimPath(int robotId);
 
 private:
 	ofEasyCam cam;

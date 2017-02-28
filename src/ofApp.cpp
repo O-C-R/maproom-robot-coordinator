@@ -170,6 +170,16 @@ void ofApp::handleOSC() {
 	}
 }
 
+void ofApp::unclaimPath(int robotId) {
+	if (robotPaths.find(robotId) == robotPaths.end()) {
+		MapPath *mp = robotPaths[robotId];
+		if (mp != NULL && mp->claimed && !mp->drawn) {
+			mp->claimed = false;
+		}
+		robotPaths.erase(robotId);
+	}
+}
+
 void ofApp::commandRobots() {
 	for (auto &p : robotsById) {
 		int id = p.first;
@@ -177,8 +187,10 @@ void ofApp::commandRobots() {
 
 		// Determine draw state
 		if (state == MR_STOPPED) {
+			unclaimPath(id);
 			r.stop();
 		} else if (r.state == R_STOPPED && state == MR_RUNNING) {
+			unclaimPath(id);
 			r.start();
 		} else if (r.state == R_READY_TO_POSITION && state == MR_RUNNING) {
 			MapPath *mp = currentMap->nextPath(r.avgPlanePos);
