@@ -2,12 +2,10 @@
 
 static const bool debugging = true;
 
-//static const string currentFile = "maproom-2017-02-26T04-23-37.025Z.svg";
 static const string currentFile = "test_case.svg";
 static const float kMarkerSize = 0.2032f;
 
 static const string filePath = "/Users/dqgorelick/Downloads/";
-
 
 static const float MAP_W = 1.0f;
 static const float MAP_H = 1.0f;

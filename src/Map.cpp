@@ -23,7 +23,7 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
     // see if duplicate path exists already in store
     
     MapPath toStore = {false, false, lineType, segment};
-
+    
     bool shouldStore = true;
 	if ((segment.end - segment.start).length() < 0.005f) {
         shouldStore = false;
@@ -46,8 +46,62 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
         }
         mapPathStore[lineType].push_back(toStore);
         storeCount++;
+        cout << "stored " << storeCount << endl;
     }
-    cout << "stored " << storeCount << endl;
+}
+
+int Map::getPathCount() {
+    int count = 0;
+    for (auto type: pathTypes) {
+        for (auto path: mapPathStore[type]) {
+            count++;
+        }
+    }
+    return count;
+}
+
+void Map::optimizePaths() {
+    const float kEpsilon = 0.001; // 1mm
+    const float kAngleDiff = 0.01; // 0.1¼
+    for (auto type: pathTypes) {
+//        for (auto &path : mapPathStore[type]) {
+        for (int i=0; i<mapPathStore[type].size(); i++) {
+            pathSegment cur = mapPathStore[type][i].segment;
+            for (int j=0; j<mapPathStore[type].size(); j++) {
+                if (i != j) {
+                    pathSegment tar = mapPathStore[type][j].segment;
+                    if(cur.end.distance(tar.start) < kEpsilon || cur.start.distance(tar.end) < kEpsilon || cur.end.distance(tar.end) < kEpsilon || cur.start.distance(tar.start) < kEpsilon) {
+                        float curAngle = cur.start.angle(cur.end);
+                        float tarAngle = tar.start.angle(tar.end);
+                        float diff = ofAngleDifferenceDegrees(curAngle, tarAngle);
+                        if (abs(diff) < kAngleDiff) {
+                            cout << "curAngle " << curAngle << endl;
+                            cout << "otherAngle " << tarAngle << endl;
+                            if (cur.end.distance(tar.start) < kEpsilon) {
+                                mapPathStore[type][i].segment.end = tar.end;
+                                mapPathStore[type][i].drawn = true;
+                                mapPathStore[type].erase(mapPathStore[type].begin() + j);
+                            } else if (cur.start.distance(tar.end) < kEpsilon) {
+                                mapPathStore[type][i].segment.start = tar.start;
+                                mapPathStore[type][i].drawn = true;
+                                mapPathStore[type].erase(mapPathStore[type].begin() + j);
+                            } else if (cur.end.distance(tar.end) < kEpsilon) {
+                                mapPathStore[type][i].segment.start = tar.start;
+                                mapPathStore[type][i].drawn = true;
+                                mapPathStore[type].erase(mapPathStore[type].begin() + j);
+                            } else {
+                                mapPathStore[type][i].segment.end = tar.end;
+                                mapPathStore[type][i].drawn = true;
+                                mapPathStore[type].erase(mapPathStore[type].begin() + j);
+                            }
+                        }
+                    } else if(cur.start.distance(tar.start) < kEpsilon) {
+                        cout << "starts are equal i: " << i << " j: " << j << endl;
+                    }
+                }
+            }
+        }
+    }
 }
 
 
@@ -149,7 +203,6 @@ void Map::loadMap(const string filename) {
                                 dest_y = stof(path.substr(startIndex, endIndex));
                                 storePath(lineType, move_x, move_y, dest_x, dest_y);
                                 pathCount++;
-//                                cout << "stored: " << move_x << " " << move_y << " " << dest_x << " " << dest_y << endl;
                                 last_x = dest_x;
                                 last_y = dest_y;
                                 startIndex = l+1;
@@ -176,7 +229,6 @@ void Map::loadMap(const string filename) {
                                 endIndex = l-1;
                                 dest_y = stof(path.substr(startIndex, endIndex));
                                 storePath(lineType, last_x, last_y, dest_x, dest_y);
-//                                cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
                                 pathCount++;
                                 last_x = dest_x;
                                 last_y = dest_y;
@@ -186,7 +238,6 @@ void Map::loadMap(const string filename) {
                                 endIndex = l-1;
                                 dest_y = stof(path.substr(startIndex, endIndex));
                                 storePath(lineType, last_x, last_y, dest_x, dest_y);
-//                                cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
                                 pathCount++;
                                 startIndex = l+1;
                                 state = 1;
@@ -194,9 +245,7 @@ void Map::loadMap(const string filename) {
                                 endIndex = l-1;
                                 dest_y = stof(path.substr(startIndex, endIndex));
                                 storePath(lineType, dest_x, dest_y, firstX, firstY);
-//                                cout << "stored: " << dest_x << " " << dest_y << " " << firstX << " " << firstY << endl;
                                 pathCount++;
-                                // todo: add edge case for Z in the middle of the string
                                 state = 1;
                             }
                             break;
@@ -210,11 +259,9 @@ void Map::loadMap(const string filename) {
                         dest_y = stof(path.substr(startIndex, endIndex));
                         if (state == 6) {
                             storePath(lineType, last_x, last_y, dest_x, dest_y);
-//                            cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
                             pathCount++;
                         } else {
                             storePath(lineType, move_x, move_y, dest_x, dest_y);
-//                            cout << "stored: " << last_x << " " << last_y << " " << dest_x << " " << dest_y << endl;
                             pathCount++;
                         }
                     }
@@ -225,6 +272,10 @@ void Map::loadMap(const string filename) {
         currentMap.popTag();
     }
     currentMap.popTag();
+//    cout << "pre optimize count: " << getPathCount() << endl;
+//    cout << "optimize SVG" << endl;
+//    optimizePaths();
+//    cout << "post optimize count: " << getPathCount() << endl;
 }
 
 MapPath* Map::nextPath(const ofVec2f &pos) {

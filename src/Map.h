@@ -34,11 +34,13 @@ public:
     
     ofxXmlSettings currentMap;
     
-    map<string, list<MapPath>> mapPathStore;
+    map<string, vector<MapPath>> mapPathStore;
     vector<string> pathTypes;
     
     void storePath(string type, float startX, float startY, float destX, float destY);
     void clearStore();
+    void optimizePaths();
+    int getPathCount();
     
 private:
 	float widthM, heightM, offsetX, offsetY, scaleX, scaleY;
