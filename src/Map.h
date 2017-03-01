@@ -8,6 +8,7 @@
 
 #ifndef Map_h
 #define Map_h
+#include <regex>
 
 #include "ofxXmlSettings.h"
 #include "ofMain.h"
@@ -27,6 +28,7 @@ class Map {
 public:
 	Map(float widthM, float heightM, float offsetX, float offsetY);
 	void loadMap(const string filename);
+    string getMostRecentMap(string path);
     
 	MapPath* nextPath(const ofVec2f &initial);
     

@@ -6,10 +6,13 @@ static const bool debugging = true;
 static const string currentFile = "test_case.svg";
 static const float kMarkerSize = 0.2032f;
 
+static const string filePath = "/Users/dqgorelick/Downloads/";
+
+
 static const float MAP_W = 1.0f;
 static const float MAP_H = 1.0f;
-static const float OFFSET_X = -0.5f;
-static const float OFFSET_Y = -0.5f;
+static const float OFFSET_X = -0.0f;
+static const float OFFSET_Y = -0.3f;
 
 static const int kNumPathsToSave = 10000;
 
@@ -54,10 +57,10 @@ void ofApp::setup() {
 	robotsByMarker[r01->markerId] = r01;
 	r01->setCommunication("192.168.7.72", 5111);
 
-//	Robot *r02 = new Robot(2, 24, "Sarah");
-//	robotsById[r02->id] = r02;
-//	robotsByMarker[r02->markerId] = r02;
-//	r02->setCommunication("192.168.1.71", 5111);
+	Robot *r02 = new Robot(2, 24, "Sarah");
+	robotsById[r02->id] = r02;
+	robotsByMarker[r02->markerId] = r02;
+	r02->setCommunication("192.168.1.71", 5111);
     
     // set up GUI
     gui = new ofxDatGui( ofxDatGuiAnchor::TOP_RIGHT );
@@ -147,8 +150,14 @@ void ofApp::setup() {
 	robotReceiver.SetNonBlocking(true);
     
     currentMap = new Map(MAP_W, MAP_H, OFFSET_X, OFFSET_Y);
-    loadMap(currentFile);
-
+    
+    string mostRecent = currentMap->getMostRecentMap(filePath);
+    if (mostRecent.size()) {
+        cout << "loading from " << mostRecent << endl;
+        loadMap(mostRecent);
+    } else {
+        loadMap("test.svg");
+    }
 	setState(MR_STOPPED);
 }
 

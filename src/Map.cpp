@@ -23,7 +23,7 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
     // see if duplicate path exists already in store
     
     MapPath toStore = {false, false, lineType, segment};
-    storeCount++;
+
     bool shouldStore = true;
 	if ((segment.end - segment.start).length() < 0.005f) {
         shouldStore = false;
@@ -41,15 +41,13 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
         }
     }
     if (shouldStore) {
-//        cout << "pathCount " << pathCount << " storeCount " << storeCount << endl;
-        // check if pathype exists in pathtypes list
         if (!mapPathStore[lineType].size()) {
             pathTypes.push_back(lineType);
         }
         mapPathStore[lineType].push_back(toStore);
+        storeCount++;
     }
-    
-//    cout << "stored " << storeCount << endl;
+    cout << "stored " << storeCount << endl;
 }
 
 
@@ -59,6 +57,35 @@ void Map::clearStore() {
         mapPathStore[pathTypes[i]].clear();
     }
     pathTypes.clear();
+}
+
+string Map::getMostRecentMap(string filePath) {
+    // TODO: make this not absolute path, or change username
+    ofDirectory dir(filePath);
+    dir.allowExt("svg");
+    dir.listDir();
+    
+    string mostRecentTime = "";
+    string file = "";
+    
+    for(int i = 0; i < dir.size(); i++){
+        string fileName = ofToString(dir.getPath(i));
+        regex r("maproom-(.+)\\.svg");
+        smatch m;
+        regex_search(fileName, m, r);
+        for(auto v: m) {
+            if (ofToString(v).size() == 24) {
+                if (mostRecentTime != "") {
+                    mostRecentTime = v;
+                    file = fileName;
+                } else if(v.compare(mostRecentTime) > 0) {
+                    mostRecentTime = v;
+                    file = fileName;
+                }
+            }
+        }
+    }
+    return file;
 }
 
 void Map::loadMap(const string filename) {
@@ -204,6 +231,8 @@ MapPath* Map::nextPath(const ofVec2f &pos) {
     MapPath *next = NULL;
     float minDist = INFINITY;
     
+    int checkedPath = 0;
+    
     for (auto &path : pathTypes) {
         if (mapPathStore.find(path) == mapPathStore.end()) {
             continue;
@@ -213,10 +242,11 @@ MapPath* Map::nextPath(const ofVec2f &pos) {
             if (mapPath.claimed || mapPath.drawn) {
                 continue;
             }
+            checkedPath++;
             
             float startDist = mapPath.segment.start.distance(pos);
             float endDist = mapPath.segment.end.distance(pos);
-            
+
             if (startDist < minDist) {
                 minDist = startDist;
                 next = &mapPath;
@@ -230,7 +260,6 @@ MapPath* Map::nextPath(const ofVec2f &pos) {
             }
         }
     }
-    
 	return next;
 }
 
