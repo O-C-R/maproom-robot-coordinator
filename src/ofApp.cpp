@@ -18,6 +18,7 @@ static char udpMessage[1024];
 static char buf[1024];
 
 //--------------------------------------------------------------
+
 void ofApp::setup() {
 	ofSetVerticalSync(true);
 	ofSetBackgroundColor(0);
@@ -124,6 +125,7 @@ void ofApp::setup() {
 
 		gui->addBreak();
     }
+    
 
     ofxDatGuiButton *reloadMapButton = gui->addButton("Reset Map");
 	reloadMapButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
@@ -134,8 +136,19 @@ void ofApp::setup() {
 			}
 		}
 	});
-
-
+    
+    ofxDatGuiButton *loadNewMapButton = gui->addButton("Load New Map");
+    loadNewMapButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
+        currentMap->clearStore();
+        string mostRecent = currentMap->getMostRecentMap(filePath);
+        if (mostRecent.size()) {
+            cout << "loading from " << mostRecent << endl;
+            loadMap(mostRecent);
+        } else {
+            loadMap("test.svg");
+        }
+    });
+    
 	gui->addFRM();
 
 	// Listen for messages from camera
@@ -157,6 +170,39 @@ void ofApp::setup() {
         loadMap("test.svg");
     }
 	setState(MR_STOPPED);
+    
+    
+    // set up paths gui
+    pathGui = new ofxDatGui( ofxDatGuiAnchor::TOP_LEFT );
+    pathGui->setTheme(new ofxDatGuiThemeMidnight());
+    
+    pathGui->addHeader("Paths GUI");
+    pathGui->addLabel("Total Active Paths: " + ofToString(currentMap->getPathCount()));
+    
+    vector<string> opts = {"INACTIVE"};
+    
+    for (auto &p : robotsById) {
+        int id = p.first;
+        opts.push_back("ROBOT: " + ofToString(id));
+    }
+
+    for (int i=0; i<currentMap->pathTypes.size(); i++) {
+        PathGui &pGui = pathGuis[i];
+        
+        string pathName = currentMap->pathTypes[i];
+        
+        pGui.togglePath = pathGui->addToggle("PATH: " + ofToString(pathName) + " \t\t- " + ofToString(currentMap->getPathCount(pathName)));
+        pGui.togglePath->setChecked(true);
+        
+        pGui.drawOptions = pathGui->addDropdown("   Draw Option:", opts);
+        pathGui->addBreak();
+        
+        pGui.togglePath->onToggleEvent([this, pathName](ofxDatGuiToggleEvent e) {
+            currentMap->setPathActive(pathName, e.checked);
+        });
+    }
+    
+    pathGui->addFooter();
 }
 
 void ofApp::exit() {
@@ -429,19 +475,23 @@ void ofApp::draw(){
     up(0.0, 0.0, kMarkerSizeM);
     
     // draw all paths
+    ofSetLineWidth(2.0);
     for (auto &i : currentMap->mapPathStore) {
         for (auto &j : i.second) {
 			if (j.drawn) {
 				ofSetColor(255, 255, 255);
 			} else if (j.claimed) {
 				ofSetColor(200, 0, 200);
-			} else {
+			} else if(!currentMap->activePaths[i.first]) {
+                ofSetColor(0, 0, 0);
+            } else {
 				ofSetColor(50, 50, 50);
 			}
-
+            
             ofDrawLine(j.segment.start, j.segment.end);
         }
     }
+    ofSetLineWidth(1.0);
 
 	for (auto &rPos : robotPositions) {
 		if (rPos.first == 0) {

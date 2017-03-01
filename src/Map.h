@@ -36,11 +36,16 @@ public:
     
     map<string, vector<MapPath>> mapPathStore;
     vector<string> pathTypes;
+    map<string, bool> activePaths;
     
     void storePath(string type, float startX, float startY, float destX, float destY);
     void clearStore();
     void optimizePaths();
+    
+    void setPathActive(string path, bool active);
+    
     int getPathCount();
+    int getPathCount(string type);
     
 private:
 	float widthM, heightM, offsetX, offsetY, scaleX, scaleY;

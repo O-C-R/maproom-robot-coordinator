@@ -30,6 +30,11 @@ typedef struct RobotGui {
 	ofxDatGuiSlider *rotationAngleSlider;
 } RobotGui;
 
+typedef struct PathGui {
+    ofxDatGuiToggle *togglePath;
+    ofxDatGuiDropdown *drawOptions;
+} PathGui;
+
 class ofApp : public ofBaseApp{
 
 	public:
@@ -37,7 +42,7 @@ class ofApp : public ofBaseApp{
 		void update();
 		void draw();
 		void exit();
-
+    
 		void keyPressed(int key);
 		void keyReleased(int key);
 		void mouseMoved(int x, int y );
@@ -60,8 +65,10 @@ class ofApp : public ofBaseApp{
     
     void loadMap(const string &name);
     void loadNextPath(Robot* r);
-
+    
 	void unclaimPath(int robotId);
+    
+    
 
 private:
 	ofEasyCam cam;
@@ -85,10 +92,12 @@ private:
 	map<int, int> robotPositionsIdx;
 
 	ofxDatGui *gui;
+    ofxDatGui *pathGui;
 	ofxDatGuiLabel *stateLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
 	map<int, RobotGui> robotGuis;
-    
+    map<int, PathGui> pathGuis;
+
     Map *currentMap;
 
 	MaproomState state;

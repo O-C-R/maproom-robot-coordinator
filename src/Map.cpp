@@ -43,6 +43,7 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
     if (shouldStore) {
         if (!mapPathStore[lineType].size()) {
             pathTypes.push_back(lineType);
+            activePaths[lineType] = true;
         }
         mapPathStore[lineType].push_back(toStore);
         storeCount++;
@@ -50,12 +51,29 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
     }
 }
 
+void Map::setPathActive(string lineType, bool active) {
+    if (mapPathStore.find(lineType) != mapPathStore.end()) {
+        activePaths[lineType] = active;
+    } else {
+        cout << lineType << " is not in activePaths" << endl;
+    }
+}
+
+
 int Map::getPathCount() {
     int count = 0;
     for (auto type: pathTypes) {
         for (auto path: mapPathStore[type]) {
             count++;
         }
+    }
+    return count;
+}
+
+int Map::getPathCount(string type) {
+    int count = 0;
+    for (auto path: mapPathStore[type]) {
+        count++;
     }
     return count;
 }
@@ -152,7 +170,6 @@ void Map::loadMap(const string filename) {
     currentMap.pushTag("svg");
     int firstLevel = currentMap.getNumTags("g");
     for (int i = 0; i < firstLevel; i++) {
-//        cout << "first_level id: " << currentMap.getAttribute("g", "id", "", i) << endl;
         currentMap.pushTag("g", i);
         int secondLevel = currentMap.getNumTags("g");
         for (int j = 0; j < secondLevel; j++) {
