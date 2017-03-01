@@ -94,7 +94,6 @@ void ofApp::setup() {
 		rGui.posLabel = rGui.folder->addLabel(r.positionString());
 		rGui.lastMessageLabel = rGui.folder->addLabel("");
 		rGui.folder->addBreak();
-
 		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
 		rGui.kp->setValue(2500.0);
 		rGui.ki = rGui.folder->addSlider("ki", 0, 100);
@@ -103,6 +102,9 @@ void ofApp::setup() {
 		rGui.kd->setValue(0.0);
 		ofxDatGuiSlider *kiMax = rGui.folder->addSlider("kiMax", 0, 10000);
 		kiMax->setValue(0.0);
+        rGui.advanceButton = rGui.folder->addButton("Skip path");
+        
+        // event listeners
 		rGui.kp->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
 			r.targetLinePID.setP(e.value);
 		});
@@ -115,6 +117,9 @@ void ofApp::setup() {
 		kiMax->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
 			r.targetLinePID.setMaxIOutput(e.value);
 		});
+        rGui.advanceButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
+            r.setState(R_DONE_DRAWING);
+        });
 
 		gui->addBreak();
     }
