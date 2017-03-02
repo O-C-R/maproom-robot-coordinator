@@ -96,7 +96,7 @@ public:
 	int id;
 	string name;
 	int markerId;
-
+    
 	// State machine
 	RobotState state;
 	float stateStartTime;

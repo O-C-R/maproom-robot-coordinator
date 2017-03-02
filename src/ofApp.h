@@ -32,6 +32,8 @@ typedef struct RobotGui {
 
 typedef struct PathGui {
     ofxDatGuiToggle *togglePath;
+    ofxDatGuiFolder *folder;
+    vector<ofxDatGuiButton *> robotSelect;
     ofxDatGuiDropdown *drawOptions;
 } PathGui;
 
@@ -99,7 +101,7 @@ private:
 
 	ofxDatGui *gui;
     ofxDatGui *pathGui;
-	ofxDatGuiLabel *stateLabel;
+	ofxDatGuiLabel *stateLabel, *pathLabel, *drawnPathLabel, *pathStatusLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
 	map<int, RobotGui> robotGuis;
     map<int, PathGui> pathGuis;

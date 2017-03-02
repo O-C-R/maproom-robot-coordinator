@@ -43,7 +43,6 @@ public:
     void optimizePaths();
     
     void setPathActive(string path, bool active);
-    
     int getPathCount();
     int getActivePathCount();
     int getDrawnPaths();

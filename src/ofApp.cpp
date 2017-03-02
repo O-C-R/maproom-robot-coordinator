@@ -177,15 +177,20 @@ void ofApp::setup() {
     pathGui->setTheme(new ofxDatGuiThemeMidnight());
     
     pathGui->addHeader("Paths GUI");
-    pathGui->addLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
+    pathLabel = pathGui->addLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
+    pathStatusLabel = pathGui->addLabel("");
+    drawnPathLabel = pathGui->addLabel("");
+    
     pathGui->addBreak();
     
-    vector<string> opts = {};
-    
+
     int dropdown_index;
+    vector<string> opts;
     for (auto &p : robotsById) {
         int id = p.first;
-        opts.push_back("ROBOT: " + ofToString(id));
+        Robot &r = *p.second;
+        
+        opts.push_back("ROBOT ID " + ofToString(id) + " - " + ofToString(r.name));
         dropDownToRobotId[dropdown_index] = id;
         dropdown_index++;
     }
@@ -199,16 +204,16 @@ void ofApp::setup() {
         pGui.togglePath->setChecked(true);
         
         if (opts.size()) {
-            pGui.drawOptions = pathGui->addDropdown("   Draw Option:", opts);
+            pGui.drawOptions = pathGui->addDropdown("Select Robot:", opts);
             // defaults to first robot for all paths
             // TODO: divy up paths differently?
             pGui.drawOptions->select(0);
             pathAssignment[pathName] = dropDownToRobotId[0];
-            pGui.drawOptions->onDropdownEvent([this, pathName](ofxDatGuiDropdownEvent e) {
-                cout << "selected robot id: " << dropDownToRobotId[e.child] << endl;
+            pGui.drawOptions->onDropdownEvent([this, pathName, pGui](ofxDatGuiDropdownEvent e) {
                 pathAssignment[pathName] = dropDownToRobotId[e.child];
             });
         }
+        
         pathGui->addBreak();
         
         pGui.togglePath->onToggleEvent([this, pathName](ofxDatGuiToggleEvent e) {
@@ -413,6 +418,28 @@ void ofApp::updateGui() {
 	char buf[1024];
 	sprintf(buf, "%s (%.2f)", stateString().c_str(), ofGetElapsedTimef() - stateStartTime);
 	stateLabel->setLabel(buf);
+    
+    pathLabel->setLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
+    
+    int activePaths = currentMap->getActivePathCount();
+    int drawnPaths = currentMap->getDrawnPaths();
+    int pathsLeft = activePaths - drawnPaths;
+    float percentage = (activePaths > 0 ? drawnPaths / activePaths : 100);
+    
+    sprintf(buf, "Drawn (active) Paths: %d", drawnPaths);
+    pathStatusLabel->setLabel(buf);
+    
+    sprintf(buf, "Active Paths Remaining %d, percentage drawn: (%.2f)", drawnPaths, percentage);
+    drawnPathLabel->setLabel(buf);
+    
+    static const ofColor enabled(50, 50, 100), disabled(50, 50, 50);
+    
+    for (int i=0; i<currentMap->pathTypes.size(); i++) {
+        PathGui &pGui = pathGuis[i];
+        bool pathActive = currentMap->activePaths[currentMap->pathTypes[i]];
+        pGui.togglePath->setBackgroundColor(pathActive ? enabled : disabled);
+        pGui.drawOptions->setBackgroundColor(pathActive ? enabled : disabled);
+    }
 }
 
 void ofApp::loadNextPath(Robot* r) {
@@ -505,7 +532,6 @@ void ofApp::draw(){
             ofDrawLine(j.segment.start, j.segment.end);
         }
     }
-    cout << currentMap->getActivePathCount() << endl;
     ofSetLineWidth(1.0);
 
 	for (auto &rPos : robotPositions) {

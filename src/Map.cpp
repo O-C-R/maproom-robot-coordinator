@@ -80,6 +80,7 @@ int Map::getDrawnPaths() {
             }
         }
     }
+    return count;
 }
 
 int Map::getPathCount() {
