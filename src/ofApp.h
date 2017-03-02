@@ -68,7 +68,13 @@ class ofApp : public ofBaseApp{
     
 	void unclaimPath(int robotId);
     
+    // path gui
+    // int dropdown_index, int robot_id
+    map <int, int> dropDownToRobotId;
     
+    // which paths belong to which robot
+    // string pathType, int robot_id
+    map<string, int> pathAssignment;
 
 private:
 	ofEasyCam cam;

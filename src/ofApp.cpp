@@ -177,13 +177,17 @@ void ofApp::setup() {
     pathGui->setTheme(new ofxDatGuiThemeMidnight());
     
     pathGui->addHeader("Paths GUI");
-    pathGui->addLabel("Total Active Paths: " + ofToString(currentMap->getPathCount()));
+    pathGui->addLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
+    pathGui->addBreak();
     
-    vector<string> opts = {"INACTIVE"};
+    vector<string> opts = {};
     
+    int dropdown_index;
     for (auto &p : robotsById) {
         int id = p.first;
         opts.push_back("ROBOT: " + ofToString(id));
+        dropDownToRobotId[dropdown_index] = id;
+        dropdown_index++;
     }
 
     for (int i=0; i<currentMap->pathTypes.size(); i++) {
@@ -194,7 +198,17 @@ void ofApp::setup() {
         pGui.togglePath = pathGui->addToggle("PATH: " + ofToString(pathName) + " \t\t- " + ofToString(currentMap->getPathCount(pathName)));
         pGui.togglePath->setChecked(true);
         
-        pGui.drawOptions = pathGui->addDropdown("   Draw Option:", opts);
+        if (opts.size()) {
+            pGui.drawOptions = pathGui->addDropdown("   Draw Option:", opts);
+            // defaults to first robot for all paths
+            // TODO: divy up paths differently?
+            pGui.drawOptions->select(0);
+            pathAssignment[pathName] = dropDownToRobotId[0];
+            pGui.drawOptions->onDropdownEvent([this, pathName](ofxDatGuiDropdownEvent e) {
+                cout << "selected robot id: " << dropDownToRobotId[e.child] << endl;
+                pathAssignment[pathName] = dropDownToRobotId[e.child];
+            });
+        }
         pathGui->addBreak();
         
         pGui.togglePath->onToggleEvent([this, pathName](ofxDatGuiToggleEvent e) {
@@ -491,6 +505,7 @@ void ofApp::draw(){
             ofDrawLine(j.segment.start, j.segment.end);
         }
     }
+    cout << currentMap->getActivePathCount() << endl;
     ofSetLineWidth(1.0);
 
 	for (auto &rPos : robotPositions) {

@@ -45,6 +45,8 @@ public:
     void setPathActive(string path, bool active);
     
     int getPathCount();
+    int getActivePathCount();
+    int getDrawnPaths();
     int getPathCount(string type);
     
 private:

@@ -119,7 +119,7 @@ public:
 	ofVec3f tvec, rvec;
 	float lastCameraUpdateTime;
 	float cvFramerate;
-
+    
 	// Derived from CV
 	ofMatrix4x4 mat;
 	ofVec3f worldPos;

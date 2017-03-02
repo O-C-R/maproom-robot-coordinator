@@ -59,6 +59,28 @@ void Map::setPathActive(string lineType, bool active) {
     }
 }
 
+int Map::getActivePathCount() {
+    int count = 0;
+    for (auto &i : mapPathStore) {
+        if (activePaths[i.first]) {
+            for (auto &j : i.second) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+int Map::getDrawnPaths() {
+    int count = 0;
+    for (auto &i : mapPathStore) {
+        if (activePaths[i.first]) {
+            for (auto &j : i.second) {
+                if (j.drawn) count++;
+            }
+        }
+    }
+}
 
 int Map::getPathCount() {
     int count = 0;
