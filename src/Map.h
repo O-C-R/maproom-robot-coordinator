@@ -30,7 +30,7 @@ public:
 	void loadMap(const string filename);
     string getMostRecentMap(string path);
     
-	MapPath* nextPath(const ofVec2f &initial);
+	MapPath* nextPath(const ofVec2f &initial, int robotId);
     
     ofxXmlSettings currentMap;
     
@@ -48,6 +48,8 @@ public:
     int getDrawnPaths();
     int getPathCount(string type);
     
+    // string pathType, int robot_id
+    map<string, int> pathAssignment;
 private:
 	float widthM, heightM, offsetX, offsetY, scaleX, scaleY;
 	vector<MapPath> paths;

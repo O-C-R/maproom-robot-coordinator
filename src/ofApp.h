@@ -1,4 +1,4 @@
-#pragma once
+#pragma once 
 
 #include "ofMain.h"
 #include "ofxDatGui.h"
@@ -60,23 +60,20 @@ class ofApp : public ofBaseApp{
 	void setState(MaproomState newState);
 	string stateString();
 	void updateGui();
-
+    void receiveGuiUpdates();
+    
 	void handleOSC();
 	void receiveFromRobots();
 	void commandRobots();
     
     void loadMap(const string &name);
-    void loadNextPath(Robot* r);
     
 	void unclaimPath(int robotId);
     
     // path gui
     // int dropdown_index, int robot_id
     map <int, int> dropDownToRobotId;
-    
-    // which paths belong to which robot
-    // string pathType, int robot_id
-    map<string, int> pathAssignment;
+
 
 private:
 	ofEasyCam cam;

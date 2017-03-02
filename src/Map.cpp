@@ -318,7 +318,7 @@ void Map::loadMap(const string filename) {
 //    cout << "post optimize count: " << getPathCount() << endl;
 }
 
-MapPath* Map::nextPath(const ofVec2f &pos) {
+MapPath* Map::nextPath(const ofVec2f &pos, int robotId) {
     MapPath *next = NULL;
     float minDist = INFINITY;
     
@@ -328,7 +328,13 @@ MapPath* Map::nextPath(const ofVec2f &pos) {
         if (mapPathStore.find(path) == mapPathStore.end()) {
             continue;
         }
+    
+        // check if path is active and that it belongs to the robotId
+        if (!activePaths[path] || pathAssignment[path] != robotId) {
+            continue;
+        }
 
+        // check if robot has that
         for (auto &mapPath : mapPathStore[path]) {
             if (mapPath.claimed || mapPath.drawn) {
                 continue;

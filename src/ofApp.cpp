@@ -183,15 +183,17 @@ void ofApp::setup() {
     
     pathGui->addBreak();
     
-
     int dropdown_index;
     vector<string> opts;
     for (auto &p : robotsById) {
         int id = p.first;
         Robot &r = *p.second;
         
-        opts.push_back("ROBOT ID " + ofToString(id) + " - " + ofToString(r.name));
-        dropDownToRobotId[dropdown_index] = id;
+        // note: don't change the order of label. datGuiDropdown event handler is broken so we have to parse the string to get the selected ID
+        opts.push_back(ofToString(id) + " ID ROBOT - " + ofToString(r.name));
+        dropDownToRobotId[dropdown_index] = r.id;
+        cout << r.id << endl;
+        cout << "dropDownToRobotId[dropdown_index] " << dropDownToRobotId[dropdown_index] << endl;
         dropdown_index++;
     }
 
@@ -207,11 +209,9 @@ void ofApp::setup() {
             pGui.drawOptions = pathGui->addDropdown("Select Robot:", opts);
             // defaults to first robot for all paths
             // TODO: divy up paths differently?
-            pGui.drawOptions->select(0);
-            pathAssignment[pathName] = dropDownToRobotId[0];
-            pGui.drawOptions->onDropdownEvent([this, pathName, pGui](ofxDatGuiDropdownEvent e) {
-                pathAssignment[pathName] = dropDownToRobotId[e.child];
-            });
+            int initial = 0;
+            pGui.drawOptions->select(initial);
+            currentMap->pathAssignment[pathName] = dropDownToRobotId[initial];
         }
         
         pathGui->addBreak();
@@ -251,6 +251,7 @@ void ofApp::update(){
 	handleOSC();
 	receiveFromRobots();
 	commandRobots();
+    receiveGuiUpdates();
 	updateGui();
 }
 
@@ -339,7 +340,7 @@ void ofApp::commandRobots() {
 			unclaimPath(id);
 			r.start();
 		} else if (r.state == R_READY_TO_POSITION && state == MR_RUNNING) {
-			MapPath *mp = currentMap->nextPath(r.avgPlanePos);
+			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id);
 			robotPaths[id] = mp;
 
 			if (mp != NULL) {
@@ -414,6 +415,16 @@ void ofApp::commandRobots() {
 	}
 }
 
+void ofApp::receiveGuiUpdates() {
+    for (int i=0; i<currentMap->pathTypes.size(); i++) {
+        PathGui &pGui = pathGuis[i];
+        ofxDatGuiDropdownOption selected = *pGui.drawOptions->getSelected();
+        
+        int selectedRobot = atoi(ofToString(selected.getLabel()[0]).c_str());
+        currentMap->pathAssignment[currentMap->pathTypes[i]] = selectedRobot;
+    }
+}
+
 void ofApp::updateGui() {
 	char buf[1024];
 	sprintf(buf, "%s (%.2f)", stateString().c_str(), ofGetElapsedTimef() - stateStartTime);
@@ -424,7 +435,7 @@ void ofApp::updateGui() {
     int activePaths = currentMap->getActivePathCount();
     int drawnPaths = currentMap->getDrawnPaths();
     int pathsLeft = activePaths - drawnPaths;
-    float percentage = (activePaths > 0 ? drawnPaths / activePaths : 100);
+    float percentage = (activePaths > 0 ? float(drawnPaths / activePaths) : 100);
     
     sprintf(buf, "Drawn (active) Paths: %d", drawnPaths);
     pathStatusLabel->setLabel(buf);
@@ -440,21 +451,6 @@ void ofApp::updateGui() {
         pGui.togglePath->setBackgroundColor(pathActive ? enabled : disabled);
         pGui.drawOptions->setBackgroundColor(pathActive ? enabled : disabled);
     }
-}
-
-void ofApp::loadNextPath(Robot* r) {
-//    MapPath nextPath = currentMap->getNextPath();
-//    float lenToStart = (nextPath.segment.start - r->navState.end).length();
-//    float lenToEnd = (nextPath.segment.end - r->navState.end).length();
-//    if (lenToStart < lenToEnd) {
-//        pathsDrawn.push_back(nextPath);
-//    } else {
-//        ofVec2f tmp = nextPath.segment.start;
-//        nextPath.segment.start = nextPath.segment.end;
-//        nextPath.segment.end = tmp;
-//        pathsDrawn.push_back(nextPath);
-//    }
-//    r->startNavigation(nextPath.segment.start, nextPath.segment.end);
 }
 
 string ofApp::stateString() {
