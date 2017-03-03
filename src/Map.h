@@ -12,6 +12,7 @@
 
 #include "ofxXmlSettings.h"
 #include "ofMain.h"
+#include "Util.h"
 
 typedef struct pathSegment {
 	ofVec2f start, end;
@@ -27,7 +28,7 @@ typedef struct MapPath {
 
 class Map {
 public:
-	Map(float widthM, float heightM, float offsetX, float offsetY);
+	Map(float widthM, float heightM, float offsetX, float offsetY, ofRectangle cropBox);
 	void loadMap(const string filename);
 	void rescaleMap(float widthM, float heightM, float offsetX, float offsetY);
     string getMostRecentMap(string path);
@@ -60,6 +61,7 @@ private:
 	int storeCount, pathCount;
 
 	ofVec2f svgExtentMin, svgExtentMax;
+	ofRectangle cropBox;
 };
 
 #endif

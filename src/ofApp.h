@@ -98,6 +98,7 @@ private:
     ofxDatGui *pathGui;
 	ofxDatGuiLabel *stateLabel, *pathLabel, *drawnPathLabel, *pathStatusLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
+	ofxDatGuiSlider *opticalCenterXSlider, *opticalCenterYSlider, *opticalScaleXSlider, *opticalScaleYSlider;
 	map<int, RobotGui> robotGuis;
 	map<int, PathGui> pathGuis;
 

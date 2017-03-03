@@ -168,11 +168,11 @@ string Robot::stateString() {
 	}
 }
 
-void Robot::updateCamera(const ofVec2f &imPos, const ofVec2f &imUp) {
+void Robot::updateCamera(const ofVec2f &imPos, const ofVec2f &imUp, const ofVec2f &opticalCenter, const ofVec2f &opticalScale) {
 	imgPos = imPos;
 	upVec = imUp;
 
-	ofVec2f newPlanePos = imPos;
+	ofVec2f newPlanePos = (imPos - opticalCenter) * opticalScale + opticalCenter;
 	glRot = atan2(imUp.y, imUp.x);
 	rot = ofRadToRobotDeg(glRot);
 

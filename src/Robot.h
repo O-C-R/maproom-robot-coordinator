@@ -50,7 +50,7 @@ public:
 	void gotHeartbeat();
 
 	// Update from CV
-	void updateCamera(const ofVec2f &imPos, const ofVec2f &imUp);
+	void updateCamera(const ofVec2f &imPos, const ofVec2f &imUp, const ofVec2f &opticalCenter, const ofVec2f &opticalScale);
 
 	// Update during loop
 	void update();

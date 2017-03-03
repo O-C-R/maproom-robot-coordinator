@@ -1,12 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
     <g id="roads">
         <g id="major_road">
-            <path d="M50.0,50.0L150.0,50.0L150,150L50.0,150L50,50" fill="none" stroke="black" stroke-width="3px"></path>
-            <path d="M75.0,75.0L125.0,75.0L125.0,125.0L75.0,125.0L75.0,75.0" fill="none" stroke="black" stroke-width="3px"></path>
-            <path d="M100.0,100.0L50.0,50.0" fill="none" stroke="black" stroke-width="3px"></path>
-            <path d="M100.0,100.0L50.0,150" fill="none" stroke="black" stroke-width="3px"></path>
-            <path d="M100.0,100.0L150.0,50" fill="none" stroke="black" stroke-width="3px"></path>
-            <path d="M100.0,100.0L150.0,150.0" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M0,0L12,0" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M0,2L12,2" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M0,4L12,4" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M0,6L12,6" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M0,8L12,8" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M0,10L12,10" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M0,12L12,12" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M0,0L0,12" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M2,0L2,12" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M4,0L4,12" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M6,0L6,12" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M8,0L8,12" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M10,0L10,12" fill="none" stroke="black" stroke-width="3px"></path>
+            <path d="M12,0L12,12" fill="none" stroke="black" stroke-width="3px"></path>
             <!-- <path d="M50,100L50,50L100,100L100,50L150,50L100,100L150,100L150,150L100,100L100,150L50,150L100,100L50,100" fill="none" stroke="black" stroke-width="3px"></path> -->
         </g>
     </g>

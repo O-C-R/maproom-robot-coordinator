@@ -1,17 +1,18 @@
 #include "ofApp.h"
 
 //static const string currentFile = "maproom-2017-02-26T04-23-37.025Z.svg";
-//static const string currentFile = "test_case.svg";
-static const string currentFile = "maproom-2017-03-02T19-03-12.993Z.svg";
-static const string filePath = "/Users/dqgorelick/Downloads/";
-static const float kMarkerSize = 0.2032f;
+static const string currentFile = "test.svg";
+//static const string currentFile = "maproom-2017-03-02T19-03-12.993Z.svg";
+static const string filePath = "/Users/anderson/Downloads/";
+static const float kRobotSize = 0.2032f;
 
-//static const float kMapWidthM = -2.72f;
-//static const float kMapHeightM = -2.72f;
-static const float kMapWidthM = -2.4f;
-static const float kMapHeightM = -2.4f;
-static const float kMapOffsetXM = -kMapWidthM / 2.0 - 0.15;
-static const float kMapOffsetYM = -kMapHeightM / 2.0 - 0.05;
+static const float kMapWidthM = -1.0f;
+static const float kMapHeightM = -1.0f;
+static const float kMapOffsetXM = -kMapWidthM / 2.0;
+static const float kMapOffsetYM = -kMapHeightM / 2.0;
+
+static const ofVec2f kOpticalCenter(-0.003, 0.12);
+static const ofVec2f kOpticalScale(0.924, 0.939);
 
 static const bool debugging = false;
 
@@ -62,6 +63,17 @@ void ofApp::setup() {
 		setState(MR_STOPPED);
 	});
 
+//	gui->addBreak();
+//
+//	opticalCenterXSlider = gui->addSlider("opticalCenterX", -1.0, 1.0);
+//	opticalCenterXSlider->setValue(-0.2);
+//	opticalCenterYSlider = gui->addSlider("opticalCenterY", -1.0, 3.0);
+//	opticalCenterYSlider->setValue(1.2);
+//	opticalScaleXSlider = gui->addSlider("opticalScaleX", 8.5, 10.0);
+//	opticalScaleXSlider->setValue(9.3);
+//	opticalScaleYSlider = gui->addSlider("opticalScaleY", 8.5, 10.0);
+//	opticalScaleYSlider->setValue(9.3);
+
 	gui->addBreak();
     
     for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
@@ -76,29 +88,29 @@ void ofApp::setup() {
 		rGui.posLabel = rGui.folder->addLabel(r.positionString());
 		rGui.lastMessageLabel = rGui.folder->addLabel("");
 		rGui.folder->addBreak();
-		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
-		rGui.kp->setValue(2500.0);
-		rGui.ki = rGui.folder->addSlider("ki", 0, 100);
-		rGui.ki->setValue(0.0);
-		rGui.kd = rGui.folder->addSlider("kd", 0, 10000);
-		rGui.kd->setValue(0.0);
-		ofxDatGuiSlider *kiMax = rGui.folder->addSlider("kiMax", 0, 10000);
-		kiMax->setValue(0.0);
+//		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
+//		rGui.kp->setValue(2500.0);
+//		rGui.ki = rGui.folder->addSlider("ki", 0, 100);
+//		rGui.ki->setValue(0.0);
+//		rGui.kd = rGui.folder->addSlider("kd", 0, 10000);
+//		rGui.kd->setValue(0.0);
+//		ofxDatGuiSlider *kiMax = rGui.folder->addSlider("kiMax", 0, 10000);
+//		kiMax->setValue(0.0);
         rGui.advanceButton = rGui.folder->addButton("Skip path");
         
         // event listeners
-		rGui.kp->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.targetLinePID.setP(e.value);
-		});
-		rGui.ki->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.targetLinePID.setI(e.value);
-		});
-		rGui.kd->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.targetLinePID.setD(e.value);
-		});
-		kiMax->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.targetLinePID.setMaxIOutput(e.value);
-		});
+//		rGui.kp->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+//			r.targetLinePID.setP(e.value);
+//		});
+//		rGui.ki->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+//			r.targetLinePID.setI(e.value);
+//		});
+//		rGui.kd->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+//			r.targetLinePID.setD(e.value);
+//		});
+//		kiMax->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+//			r.targetLinePID.setMaxIOutput(e.value);
+//		});
         rGui.advanceButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
             r.setState(R_DONE_DRAWING);
         });
@@ -140,7 +152,8 @@ void ofApp::setup() {
 	robotReceiver.Bind(5101);
 	robotReceiver.SetNonBlocking(true);
 
-    currentMap = new Map(kMapWidthM, kMapHeightM, kMapOffsetXM, kMapOffsetYM);
+	ofRectangle cropBox(ofVec2f(-0.4), ofVec2f(0.4));
+    currentMap = new Map(kMapWidthM, kMapHeightM, kMapOffsetXM, kMapOffsetYM, cropBox);
 
     string mostRecent = currentMap->getMostRecentMap(filePath);
     if (mostRecent.size()) {
@@ -287,7 +300,7 @@ void ofApp::handleOSC() {
 				ofVec2f up(jsonMsg["up"][i][0].asFloat(), jsonMsg["up"][i][1].asFloat());
 
 				if (robotsByMarker.find(markerId) != robotsByMarker.end()) {
-					robotsByMarker[markerId]->updateCamera(pos, up);
+					robotsByMarker[markerId]->updateCamera(pos, up, kOpticalCenter, kOpticalScale);
 				}
 
 				if (markersById.find(markerId) == markersById.end()) {
@@ -326,11 +339,17 @@ void ofApp::commandRobots() {
 			robotPaths[id] = mp;
 
 			if (mp != NULL) {
+				if (mp->segment.start.distance(r.avgPlanePos) > mp->segment.end.distance(r.avgPlanePos)) {
+					ofVec2f tmp = mp->segment.start;
+					mp->segment.start = mp->segment.end;
+					mp->segment.end = tmp;
+				}
+
 				mp->claimed = true;
 				r.navigateTo(mp->segment.start);
                 r.lastHeading = atan2(mp->segment.end.x - mp->segment.start.x, mp->segment.end.y - mp->segment.start.y)*180/3.14159;
 			} else {
-//				cout << "No more paths to draw!" << endl;
+				cout << "No more paths to draw!" << endl;
 			}
 		} else if (r.state == R_READY_TO_DRAW && state == MR_RUNNING) {
 			if (robotPaths.find(id) == robotPaths.end()) {
