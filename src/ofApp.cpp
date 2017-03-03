@@ -152,6 +152,9 @@ void ofApp::setup() {
 
 	setState(MR_STOPPED);
     
+    // silence logger:
+    guiLogger->quiet();
+    
     // set up paths gui
     pathGui = new ofxDatGui( ofxDatGuiAnchor::TOP_LEFT );
     pathGui->setTheme(new ofxDatGuiThemeMidnight());
@@ -326,7 +329,7 @@ void ofApp::commandRobots() {
 				mp->claimed = true;
 				r.navigateTo(mp->segment.start);
 			} else {
-				cout << "No more paths to draw!" << endl;
+//				cout << "No more paths to draw!" << endl;
 			}
 		} else if (r.state == R_READY_TO_DRAW && state == MR_RUNNING) {
 			if (robotPaths.find(id) == robotPaths.end()) {
@@ -395,6 +398,9 @@ void ofApp::commandRobots() {
 }
 
 void ofApp::receiveGuiUpdates() {
+    // event handler for dropdown is broken so this is a hack
+    // https://www.bountysource.com/issues/31521059-ofxdatguidropdown-not-collapsing-after-select-when-added-to-ofxdatgui
+    
     for (int i=0; i<currentMap->pathTypes.size(); i++) {
         PathGui &pGui = pathGuis[i];
         ofxDatGuiDropdownOption selected = *pGui.drawOptions->getSelected();
@@ -414,12 +420,12 @@ void ofApp::updateGui() {
     int activePaths = currentMap->getActivePathCount();
     int drawnPaths = currentMap->getDrawnPaths();
     int pathsLeft = activePaths - drawnPaths;
-    float percentage = (activePaths > 0 ? float(drawnPaths / activePaths) : 100);
+    float percentage = (activePaths > 0 ? float(drawnPaths) / float(activePaths) : 100);
     
     sprintf(buf, "Drawn (active) Paths: %d", drawnPaths);
     pathStatusLabel->setLabel(buf);
     
-    sprintf(buf, "Active Paths Remaining %d, percentage drawn: (%.2f)", drawnPaths, percentage);
+    sprintf(buf, "Active Paths Remaining %d, percentage drawn: %.2f%%", drawnPaths, percentage);
     drawnPathLabel->setLabel(buf);
     
     static const ofColor enabled(50, 50, 100), disabled(50, 50, 50);
@@ -453,19 +459,20 @@ void ofApp::draw(){
 
 	ofSetColor(255);
 	ofDrawAxis(1.0);
-
+    
 	// draw all paths
+
     for (auto &i : currentMap->mapPathStore) {
         for (auto &j : i.second) {
-			if (j.drawn) {
-				ofSetColor(255, 255, 255);
-			} else if (j.claimed) {
-				ofSetColor(200, 0, 200);
-			} else if(!currentMap->activePaths[i.first]) {
+            if (j.drawn) {
+                ofSetColor(255, 255, 255, 100);
+            } else if (j.claimed) {
+                ofSetColor(200, 0, 200, 100);
+            } else if(!currentMap->activePaths[i.first]) {
                 ofSetColor(0, 0, 0);
             } else {
-				ofSetColor(50, 50, 50);
-			}
+                ofSetColor(255, 100, 100);
+            }
             
             ofDrawLine(j.segment.start, j.segment.end);
         }
@@ -473,6 +480,7 @@ void ofApp::draw(){
     ofSetLineWidth(1.0);
 
 	// Draw historical positions
+
 	for (auto &rPos : robotPositions) {
 		if (rPos.first == 0) {
 			ofSetColor(255, 0, 0);

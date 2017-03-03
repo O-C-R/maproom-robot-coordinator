@@ -126,48 +126,90 @@ int Map::getPathCount(string type) {
 	return count;
 }
 
-void Map::optimizePaths() {
-	const float kEpsilon = 0.001; // 1mm
-	const float kAngleDiff = 0.01; // 0.1¼
-	for (auto type: pathTypes) {
-		//        for (auto &path : mapPathStore[type]) {
-		for (int i=0; i<mapPathStore[type].size(); i++) {
-			pathSegment cur = mapPathStore[type][i].segment;
-			for (int j=0; j<mapPathStore[type].size(); j++) {
-				if (i != j) {
-					pathSegment tar = mapPathStore[type][j].segment;
-					if(cur.end.distance(tar.start) < kEpsilon || cur.start.distance(tar.end) < kEpsilon || cur.end.distance(tar.end) < kEpsilon || cur.start.distance(tar.start) < kEpsilon) {
-						float curAngle = cur.start.angle(cur.end);
-						float tarAngle = tar.start.angle(tar.end);
-						float diff = ofAngleDifferenceDegrees(curAngle, tarAngle);
-						if (abs(diff) < kAngleDiff) {
-							cout << "curAngle " << curAngle << endl;
-							cout << "otherAngle " << tarAngle << endl;
-							if (cur.end.distance(tar.start) < kEpsilon) {
-								mapPathStore[type][i].segment.end = tar.end;
-								mapPathStore[type][i].drawn = true;
-								mapPathStore[type].erase(mapPathStore[type].begin() + j);
-							} else if (cur.start.distance(tar.end) < kEpsilon) {
-								mapPathStore[type][i].segment.start = tar.start;
-								mapPathStore[type][i].drawn = true;
-								mapPathStore[type].erase(mapPathStore[type].begin() + j);
-							} else if (cur.end.distance(tar.end) < kEpsilon) {
-								mapPathStore[type][i].segment.start = tar.start;
-								mapPathStore[type][i].drawn = true;
-								mapPathStore[type].erase(mapPathStore[type].begin() + j);
-							} else {
-								mapPathStore[type][i].segment.end = tar.end;
-								mapPathStore[type][i].drawn = true;
-								mapPathStore[type].erase(mapPathStore[type].begin() + j);
-							}
-						}
-					} else if(cur.start.distance(tar.start) < kEpsilon) {
-						cout << "starts are equal i: " << i << " j: " << j << endl;
-					}
-				}
-			}
-		}
-	}
+float getAngle(ofVec2f start, ofVec2f end) {
+    return atan2(end.x - start.x, end.y - start.y)*180/3.14159;
+}
+
+void Map::optimizePaths(float percentDiff) {
+    const float kEpsilon = 0.001; // 1mm
+    int toRemoveCount = 0;
+    for (auto type: pathTypes) {
+        for (int i=0; i<mapPathStore[type].size(); i++) {
+            pathSegment cur = mapPathStore[type][i].segment;
+            for (int j=0; j<mapPathStore[type].size(); j++) {
+                if (i != j) {
+                    pathSegment tar = mapPathStore[type][j].segment;
+                    bool endToStart = cur.end.distance(tar.start) < kEpsilon;
+                    bool startToEnd = cur.start.distance(tar.end) < kEpsilon;
+                    bool endToEnd = cur.end.distance(tar.end) == kEpsilon;
+                    bool startToStart = cur.start.distance(tar.start) == kEpsilon;
+
+                    if((endToStart || startToEnd || endToEnd || startToStart) && !mapPathStore[type][i].drawn && !mapPathStore[type][j].drawn && !mapPathStore[type][i].claimed && !mapPathStore[type][j].claimed) {
+                        float curAngle;
+                        float tarAngle;
+                        float newAngle;
+                        if (endToEnd) {
+                            curAngle = getAngle(cur.end, cur.start);
+                            tarAngle = getAngle(tar.start, tar.end);
+                        } else if (endToStart) {
+                            curAngle = getAngle(cur.end, cur.start);
+                            tarAngle = getAngle(tar.end, tar.start);
+                        } else if (startToStart) {
+                            curAngle = getAngle(cur.start, cur.end);
+                            tarAngle = getAngle(tar.end, tar.start);
+                        } else if (startToEnd) {
+                            curAngle = getAngle(cur.start, cur.end);
+                            tarAngle = getAngle(tar.start, tar.end);
+                        }
+                        
+                        
+                        MapPath tmp = mapPathStore[type][i];
+                        
+                        float diff = ((curAngle+360) - (tarAngle+360));
+                        if (abs(fmod((diff+360),360.0)) < percentDiff) {
+//                            
+//                            cout << "cur " <<  cur.start << "," << cur.end << endl;
+//                            cout << "curAngle " << curAngle << endl;
+//                            cout << "tar " <<  tar.start << "," << tar.end << endl;
+//                            cout << "tarAngle " << tarAngle << endl;
+//                            cout << "diff: " << diff << endl;
+                            
+                            if (startToStart) {
+                                mapPathStore[type][i].segment.end = mapPathStore[type][j].segment.end;
+                            } else if (startToEnd) {
+                                mapPathStore[type][i].segment.start = mapPathStore[type][j].segment.start;
+                            } else if (endToStart) {
+                                mapPathStore[type][i].segment.end = mapPathStore[type][j].segment.end;
+                            } else if (endToEnd) {
+                                mapPathStore[type][i].segment.end = mapPathStore[type][j].segment.start;
+                            }
+
+                            cout << "similar degrees" << endl;
+                            mapPathStore[type][j].claimed = true;
+                            toRemoveCount++;
+//                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // remove all claimed path
+    int removedPaths = 0;
+    while(toRemoveCount > 0) {
+        for (auto type: pathTypes) {
+            for (int i=0; i<mapPathStore[type].size(); i++) {
+                if (mapPathStore[type][i].claimed) {
+                    mapPathStore[type].erase(mapPathStore[type].begin() + i);
+                    toRemoveCount--;
+                    removedPaths++;
+                    break;
+                }
+                
+            }
+        }
+    }
+    cout << "removed paths " << removedPaths << endl;
 }
 
 void Map::clearStore() {
@@ -370,6 +412,12 @@ void Map::rescaleMap(float width, float height, float newOffsetX, float newOffse
 			mapPath.segment.end = mapPath.segment.prescaleEnd * scale + offset;
 		}
 	}
+    
+    cout << "pre optimize count: " << getPathCount() << endl;
+    cout << "optimize SVG" << endl;
+    float optPercent = 6;
+    optimizePaths(optPercent);
+    cout << "post optimize count: " << getPathCount() << endl;
 }
 
 MapPath* Map::nextPath(const ofVec2f &pos, int robotId) {

@@ -94,6 +94,7 @@ private:
 	map<int, int> robotPositionsIdx;
 
 	ofxDatGui *gui;
+    ofxDatGuiLog *guiLogger;
     ofxDatGui *pathGui;
 	ofxDatGuiLabel *stateLabel, *pathLabel, *drawnPathLabel, *pathStatusLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;

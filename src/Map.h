@@ -37,12 +37,13 @@ public:
     ofxXmlSettings currentMap;
     
     map<string, vector<MapPath>> mapPathStore;
+    
     vector<string> pathTypes;
     map<string, bool> activePaths;
     
     void storePath(string type, float startX, float startY, float destX, float destY);
     void clearStore();
-    void optimizePaths();
+    void optimizePaths(float percent);
     
     void setPathActive(string path, bool active);
     int getPathCount();
