@@ -472,7 +472,7 @@ void ofApp::draw(){
             } else if(!currentMap->activePaths[i.first]) {
                 ofSetColor(0, 0, 0);
             } else {
-                ofSetColor(255, 100, 100);
+                ofSetColor(90, 90, 90);
             }
             
             ofDrawLine(j.segment.start, j.segment.end);
