@@ -38,13 +38,6 @@ typedef enum PenState {
 	P_DOWN
 } PenState;
 
-typedef struct NavigationState {
-    int pathType;
-    bool drawReady, readyForNextPath;
-    ofVec2f start, end;
-} NavigationState;
-
-
 class Robot {
 
 public:
@@ -57,7 +50,7 @@ public:
 	void gotHeartbeat();
 
 	// Update from CV
-	void updateCamera(const ofVec3f &rvec, const ofVec3f &tvec, const ofMatrix3x3 &rmat, const ofMatrix4x4 &cameraWorldInv);
+	void updateCamera(const ofVec2f &imPos, const ofVec2f &imUp);
 
 	// Update during loop
 	void update();
@@ -116,16 +109,15 @@ public:
 	char msg[128];
 
 	// Received from CV
-	ofVec3f tvec, rvec;
+	ofVec3f imgPos, upVec;
 	float lastCameraUpdateTime;
 	float cvFramerate;
 
 	// Derived from CV
-	ofMatrix4x4 mat;
-	ofVec3f worldPos;
 	ofVec2f planePos, avgPlanePos, slowAvgPlanePos, allAvgPlanePos;
 	ofVec2f planeVel, avgPlaneVel;
 	float rot, avgRot;
+	float glRot, avgGlRot;
 
 	// debug: visualizing states
 	ofVec2f dirToLine, backToLine, vecToEnd, movement;

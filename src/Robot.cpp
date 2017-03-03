@@ -52,7 +52,7 @@ inline float constrainTo360(const float deg) {
 }
 
 inline float ofRadToRobotDeg(const float rad) {
-	return fmod(ofRadToDeg(rad) + 360 - 90, 360.0);
+	return constrainTo360(360 - ofRadToDeg(rad) + 90);
 }
 
 inline float robotDegToOfRad(const float deg) {
@@ -75,6 +75,8 @@ Robot::Robot(int rId, int mId, const string &n) :
 	targetPlanePos(0, 0),
 	rot(0),
 	avgRot(0),
+	glRot(0),
+	avgGlRot(),
 	stateStartTime(0),
 	lastCameraUpdateTime(-1000),
 	cvFramerate(0),
@@ -125,10 +127,9 @@ string Robot::stateDescription() {
 
 string Robot::positionString() {
 	char buf[512];
-	sprintf(buf, "(%+07.1f, %+07.1f, %+07.1f) @ %03.1f%c (%.1f fps)",
-			avgPlanePos.x * 100.0, avgPlanePos.y * 100.0,
-			mat.getTranslation().z * 100.0,
-			avgRot, char(176),
+	sprintf(buf, "(%+07.1f, %+07.1f) @ %03.1f%c (%.1f fps)",
+			planePos.x * 100.0, planePos.y * 100.0,
+			rot, char(176),
 			cvFramerate);
 	return buf;
 }
@@ -164,35 +165,15 @@ string Robot::stateString() {
 	}
 }
 
-// TODO: fix this math somehow
-void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const ofMatrix3x3 &rmat, const ofMatrix4x4 &cameraWorldInv) {
-	rvec = newRvec;
-	tvec = newTvec;
+void Robot::updateCamera(const ofVec2f &imPos, const ofVec2f &imUp) {
+	imgPos = imPos;
+	upVec = imUp;
 
-	// Convert from Rodrigues formulation of rotation matrix
-	// http://answers.opencv.org/question/110441/use-rotation-vector-from-aruco-in-unity3d/
-	float angle = sqrt(rvec.x*rvec.x + rvec.y*rvec.y + rvec.z*rvec.z);
-	ofVec3f axis(rvec.x, rvec.y, rvec.z);
+	ofVec2f newPlanePos = imPos;
+	glRot = atan2(imUp.y, imUp.x);
+	rot = ofRadToRobotDeg(glRot);
 
-	ofQuaternion rvecQuat;
-	rvecQuat.makeRotate(ofRadToDeg(angle), axis);
-
-	mat.makeIdentityMatrix();
-	mat.setRotate(rvecQuat);
-	mat.setTranslation(tvec);
-	mat = mat * cameraWorldInv;
-
-	// Get position in world
-	worldPos = mat.getTranslation();
-
-	// Calculate plane positions, smoothed over time.
-	ofVec2f newPlanePos(worldPos.x, worldPos.y);
 	allAvgPlanePos += (newPlanePos - allAvgPlanePos) * 0.5;
-
-	// Skip outliers
-	if (newPlanePos.distance(allAvgPlanePos) > 0.01) {
-		return;
-	}
 
 	const float now = ofGetElapsedTimef();
 	const float dt = now - lastCameraUpdateTime;
@@ -205,20 +186,12 @@ void Robot::updateCamera(const ofVec3f &newRvec, const ofVec3f &newTvec, const o
 
 	// Update positions and previous averages
 	planePos.set(newPlanePos);
-	avgPlanePos += (planePos - avgPlanePos) * 0.25;
-	slowAvgPlanePos += (planePos - slowAvgPlanePos) * 0.075;
+	avgPlanePos += (planePos - avgPlanePos) * 0.5;
 
-	// Get z-axis rotation
-	// Rotation is right-handed, and goes from 0-360 starting on the +x axis
-	static const ofVec3f upVec(0.0, 1.0, 0.0);
-	ofVec3f angAxis = upVec * mat;
-	ofVec2f axisVec = ofVec2f(angAxis.x, angAxis.y) - ofVec2f(worldPos.x, worldPos.y);
-	float axisAngle = atan2(axisVec.y, axisVec.x);
-
-	// Translate rotation into robot coordinates
-	rot = ofRadToRobotDeg(axisAngle);
-	avgRot += ofAngleDifferenceDegrees(avgRot, rot) * 0.1;
+	avgRot += ofAngleDifferenceDegrees(avgRot, rot) * 0.5;
 	avgRot = constrainTo360(avgRot);
+	avgGlRot += ofAngleDifferenceRadians(avgGlRot, glRot) * 0.1;
+	avgGlRot = fmod(avgGlRot +  3.1415964 * 2.0, 3.1415964 * 2.0);
 
 	const float framerate = 1.0 / dt;
 	cvFramerate += (framerate - cvFramerate) * 0.1;
@@ -286,7 +259,7 @@ void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 }
 
 bool Robot::atRotation() {
-	return abs(ofAngleDifferenceDegrees(targetRot, avgRot)) < kRotationTolerance;
+	return abs(ofAngleDifferenceDegrees(targetRot, rot)) < kRotationTolerance;
 }
 
 bool Robot::inPosition(const ofVec2f &pos) {
@@ -434,7 +407,7 @@ void Robot::update() {
 	}
 
 	// Only send messages every so often to avoid hammering the Arduino.
-	if (mustSend || (shouldSend && ofGetFrameNum() % 6 == 0)) {
+	if (mustSend || (shouldSend && ofGetFrameNum() % 4 == 0)) {
 		sendMessage(msg);
 	}
 }

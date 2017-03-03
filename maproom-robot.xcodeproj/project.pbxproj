@@ -27,8 +27,9 @@
 		67FE4C7B15C2F0478C8126C2 /* NetworkingUtils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3B361208CD4107E479F04E7B /* NetworkingUtils.cpp */; };
 		6A565A9714A6A12EB9098F52 /* src_colors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27DFA5E4C611C297AADB2002 /* src_colors.cpp */; };
 		6F671E03F328673BE18F53DE /* Map.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 02A898398518BEEBFBB5AB11 /* Map.cpp */; };
-		7179F87E1E6518CF00C68E2C /* MiniPID.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7179F87B1E6518CF00C68E2C /* MiniPID.cpp */; };
-		7179F87F1E6518CF00C68E2C /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 7179F87D1E6518CF00C68E2C /* README.md */; };
+		712C50F91E693067008885F1 /* MiniPID.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 712C50F61E693067008885F1 /* MiniPID.cpp */; };
+		712C50FA1E693067008885F1 /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 712C50F81E693067008885F1 /* README.md */; };
+		7179F8821E665CBD00C68E2C /* ArucoMarker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7179F8801E665CBD00C68E2C /* ArucoMarker.cpp */; };
 		72A929D3561B8232A182ABFC /* ofxOscBundle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65EEFA3DA3526E9CDD9C21F9 /* ofxOscBundle.cpp */; };
 		837220E80EB56CD44AD27F2A /* ofxSlider.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 15F2C6477A769C03A56D1401 /* ofxSlider.cpp */; };
 		856AA354D08AB4B323081444 /* ofxBaseGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9604B925D32EE39065747725 /* ofxBaseGui.cpp */; };
@@ -139,12 +140,14 @@
 		64C563B8158C37E9D07AE29D /* ofxDatGuiFRM.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiFRM.h; path = ../../../addons/ofxDatGui/src/components/ofxDatGuiFRM.h; sourceTree = SOURCE_ROOT; };
 		65EEFA3DA3526E9CDD9C21F9 /* ofxOscBundle.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOscBundle.cpp; path = ../../../addons/ofxOsc/src/ofxOscBundle.cpp; sourceTree = SOURCE_ROOT; };
 		6B65E6930994CC4B2D2B8B33 /* OscPacketListener.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = OscPacketListener.h; path = ../../../addons/ofxOsc/libs/oscpack/src/osc/OscPacketListener.h; sourceTree = SOURCE_ROOT; };
-		7179F8781E6518CF00C68E2C /* Basic.ino */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Basic.ino; sourceTree = "<group>"; };
-		7179F8791E6518CF00C68E2C /* keywords.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = keywords.txt; sourceTree = "<group>"; };
-		7179F87A1E6518CF00C68E2C /* LICENSE.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
-		7179F87B1E6518CF00C68E2C /* MiniPID.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MiniPID.cpp; sourceTree = "<group>"; };
-		7179F87C1E6518CF00C68E2C /* MiniPID.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MiniPID.h; sourceTree = "<group>"; };
-		7179F87D1E6518CF00C68E2C /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		712C50F31E693067008885F1 /* Basic.ino */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Basic.ino; sourceTree = "<group>"; };
+		712C50F41E693067008885F1 /* keywords.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = keywords.txt; sourceTree = "<group>"; };
+		712C50F51E693067008885F1 /* LICENSE.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
+		712C50F61E693067008885F1 /* MiniPID.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MiniPID.cpp; sourceTree = "<group>"; };
+		712C50F71E693067008885F1 /* MiniPID.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MiniPID.h; sourceTree = "<group>"; };
+		712C50F81E693067008885F1 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		7179F8801E665CBD00C68E2C /* ArucoMarker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ArucoMarker.cpp; sourceTree = "<group>"; };
+		7179F8811E665CBD00C68E2C /* ArucoMarker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArucoMarker.h; sourceTree = "<group>"; };
 		744031A3E8F8DAF9FE6F3EA8 /* ofxDatGuiGroups.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiGroups.h; path = ../../../addons/ofxDatGui/src/components/ofxDatGuiGroups.h; sourceTree = SOURCE_ROOT; };
 		7689F8A0F3D0B7635A8C3104 /* ofxOscArg.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOscArg.h; path = ../../../addons/ofxOsc/src/ofxOscArg.h; sourceTree = SOURCE_ROOT; };
 		787315438BF1DD00C81DF413 /* ofxDatGuiLabel.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiLabel.h; path = ../../../addons/ofxDatGui/src/components/ofxDatGuiLabel.h; sourceTree = SOURCE_ROOT; };
@@ -427,39 +430,39 @@
 			name = src;
 			sourceTree = "<group>";
 		};
-		7179F8741E6518CF00C68E2C /* third_party */ = {
+		712C50EF1E693067008885F1 /* third_party */ = {
 			isa = PBXGroup;
 			children = (
-				7179F8751E6518CF00C68E2C /* MiniPID */,
+				712C50F01E693067008885F1 /* MiniPID */,
 			);
 			path = third_party;
 			sourceTree = "<group>";
 		};
-		7179F8751E6518CF00C68E2C /* MiniPID */ = {
+		712C50F01E693067008885F1 /* MiniPID */ = {
 			isa = PBXGroup;
 			children = (
-				7179F8761E6518CF00C68E2C /* examples */,
-				7179F8791E6518CF00C68E2C /* keywords.txt */,
-				7179F87A1E6518CF00C68E2C /* LICENSE.txt */,
-				7179F87B1E6518CF00C68E2C /* MiniPID.cpp */,
-				7179F87C1E6518CF00C68E2C /* MiniPID.h */,
-				7179F87D1E6518CF00C68E2C /* README.md */,
+				712C50F11E693067008885F1 /* examples */,
+				712C50F41E693067008885F1 /* keywords.txt */,
+				712C50F51E693067008885F1 /* LICENSE.txt */,
+				712C50F61E693067008885F1 /* MiniPID.cpp */,
+				712C50F71E693067008885F1 /* MiniPID.h */,
+				712C50F81E693067008885F1 /* README.md */,
 			);
 			path = MiniPID;
 			sourceTree = "<group>";
 		};
-		7179F8761E6518CF00C68E2C /* examples */ = {
+		712C50F11E693067008885F1 /* examples */ = {
 			isa = PBXGroup;
 			children = (
-				7179F8771E6518CF00C68E2C /* Basic */,
+				712C50F21E693067008885F1 /* Basic */,
 			);
 			path = examples;
 			sourceTree = "<group>";
 		};
-		7179F8771E6518CF00C68E2C /* Basic */ = {
+		712C50F21E693067008885F1 /* Basic */ = {
 			isa = PBXGroup;
 			children = (
-				7179F8781E6518CF00C68E2C /* Basic.ino */,
+				712C50F31E693067008885F1 /* Basic.ino */,
 			);
 			path = Basic;
 			sourceTree = "<group>";
@@ -654,8 +657,8 @@
 				E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */,
 				E4EB6923138AFD0F00A09F29 /* Project.xcconfig */,
 				E4B69E1C0A3A1BDC003C02F2 /* src */,
-				7179F8741E6518CF00C68E2C /* third_party */,
 				E4EEC9E9138DF44700A80321 /* openFrameworks */,
+				712C50EF1E693067008885F1 /* third_party */,
 				BB4B014C10F69532006C3DED /* addons */,
 				6948EE371B920CB800B5AC1A /* local_addons */,
 				E4B69B5B0A3A1756003C02F2 /* maproom-robotDebug.app */,
@@ -672,6 +675,8 @@
 				EA9976C69FEC6F9258AA447D /* Map.h */,
 				CA87531C11BAEA6FC53045C8 /* Robot.cpp */,
 				44FFBA4850C6E6DD3C109CAE /* Robot.h */,
+				7179F8801E665CBD00C68E2C /* ArucoMarker.cpp */,
+				7179F8811E665CBD00C68E2C /* ArucoMarker.h */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;
@@ -840,12 +845,12 @@
 				C8D5E1AE03FCF0825420E3B6 /* Robot.cpp in Sources */,
 				D3C1C48E59CAA2D68C0DD477 /* ofxDatGuiComponent.cpp in Sources */,
 				9CF4130A7E6DA19A3DC42B9A /* ofxSmartFont.cpp in Sources */,
+				712C50FA1E693067008885F1 /* README.md in Sources */,
 				C9466C434D1CF8AB968D298D /* ofxDatGui.cpp in Sources */,
 				92A2AEA9DE999252B08DB79B /* ofxGeoJSON.cpp in Sources */,
 				856AA354D08AB4B323081444 /* ofxBaseGui.cpp in Sources */,
 				5CBB2AB3A60F65431D7B555D /* ofxButton.cpp in Sources */,
 				B266578FC55D23BFEBC042E7 /* ofxGuiGroup.cpp in Sources */,
-				7179F87F1E6518CF00C68E2C /* README.md in Sources */,
 				483908258D00B98B4BE69F07 /* ofxLabel.cpp in Sources */,
 				F285EB3169F1566CA3D93C20 /* ofxPanel.cpp in Sources */,
 				837220E80EB56CD44AD27F2A /* ofxSlider.cpp in Sources */,
@@ -863,11 +868,12 @@
 				640279EE111671BD026CB013 /* ofxOscReceiver.cpp in Sources */,
 				8F5205AEF8861EF234F0651A /* ofxOscSender.cpp in Sources */,
 				ADE367465D2A8EBAD4C7A8D9 /* IpEndpointName.cpp in Sources */,
+				7179F8821E665CBD00C68E2C /* ArucoMarker.cpp in Sources */,
 				67FE4C7B15C2F0478C8126C2 /* NetworkingUtils.cpp in Sources */,
 				510CAFE035E576A4E1502D52 /* UdpSocket.cpp in Sources */,
+				712C50F91E693067008885F1 /* MiniPID.cpp in Sources */,
 				62545D179C94265CA1389D4A /* OscOutboundPacketStream.cpp in Sources */,
 				C4782ECC372420ACE0615B74 /* OscPrintReceivedElements.cpp in Sources */,
-				7179F87E1E6518CF00C68E2C /* MiniPID.cpp in Sources */,
 				0546D1A38E13BD319CC9755B /* OscReceivedElements.cpp in Sources */,
 				879A251454401BC0B6E4F238 /* OscTypes.cpp in Sources */,
 				B88A57B4B0BA6191EF3571E9 /* ofxSvg.cpp in Sources */,
@@ -1040,6 +1046,7 @@
 				HEADER_SEARCH_PATHS = (
 					"$(OF_CORE_HEADERS)",
 					src,
+					"$SOURCE_ROOT/**",
 					../../../addons/ofxDatGui/src,
 					../../../addons/ofxDatGui/src/components,
 					../../../addons/ofxDatGui/src/core,
@@ -1098,6 +1105,7 @@
 				HEADER_SEARCH_PATHS = (
 					"$(OF_CORE_HEADERS)",
 					src,
+					"$SOURCE_ROOT/**",
 					../../../addons/ofxDatGui/src,
 					../../../addons/ofxDatGui/src/components,
 					../../../addons/ofxDatGui/src/core,

@@ -8,7 +8,11 @@
 
 #include "Map.h"
 
-Map::Map(float width, float height, float offsetX, float offsetY): widthM(width), heightM(height), offsetX(offsetX), offsetY(offsetY) {}
+Map::Map(float width, float height, float offsetX, float offsetY):
+	widthM(width), heightM(height),
+	offsetX(offsetX), offsetY(offsetY),
+	svgExtentMin(10000), svgExtentMax(-10000)
+{}
 
 int storeCount = 0;
 int pathCount = 0;
@@ -17,42 +21,43 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
     // be wary of strings with types of the same first two letters
 
     pathSegment segment;
-    segment.start = ofVec2f(scaleX*startX + offsetX, scaleY*startY + offsetY);
-    segment.end = ofVec2f(scaleY*destX + offsetX, scaleY*destY + offsetY);
-    
-    // see if duplicate path exists already in store
+	segment.prescaleStart = ofVec2f(startX, startY);
+	segment.prescaleEnd = ofVec2f(destX, destY);
     
     MapPath toStore = {false, false, lineType, segment};
     storeCount++;
-    bool shouldStore = true;
-	if ((segment.end - segment.start).length() < 0.005f) {
-        shouldStore = false;
-    }
-    for (auto &path : mapPathStore[lineType]) {
-        if (!shouldStore) {
-            break;
-        }
-        
-        const float kEpsilon = 0.001; // 1mm
-        if (path.segment.start.distance(segment.start) < kEpsilon && path.segment.end.distance(segment.end) < kEpsilon) {
-            shouldStore = false;
-        } else if (path.segment.end.distance(segment.start) < kEpsilon && path.segment.start.distance(segment.end) < kEpsilon) {
-            shouldStore = false;
-        }
-    }
-    if (shouldStore) {
-//        cout << "pathCount " << pathCount << " storeCount " << storeCount << endl;
-        // check if pathype exists in pathtypes list
-        if (!mapPathStore[lineType].size()) {
-            pathTypes.push_back(lineType);
-        }
-        mapPathStore[lineType].push_back(toStore);
-    }
-    
-//    cout << "stored " << storeCount << endl;
+
+	if (!mapPathStore[lineType].size()) {
+		pathTypes.push_back(lineType);
+	}
+	mapPathStore[lineType].push_back(toStore);
+
+	if (segment.prescaleStart.x > svgExtentMax.x) {
+		svgExtentMax.x = segment.prescaleStart.x;
+	}
+	if (segment.prescaleStart.y > svgExtentMax.y) {
+		svgExtentMax.y = segment.prescaleStart.y;
+	}
+	if (segment.prescaleStart.x < svgExtentMin.x) {
+		svgExtentMin.x = segment.prescaleStart.x;
+	}
+	if (segment.prescaleStart.y < svgExtentMin.y) {
+		svgExtentMin.y = segment.prescaleStart.y;
+	}
+
+	if (segment.prescaleEnd.x > svgExtentMax.x) {
+		svgExtentMax.x = segment.prescaleEnd.x;
+	}
+	if (segment.prescaleEnd.y > svgExtentMax.y) {
+		svgExtentMax.y = segment.prescaleEnd.y;
+	}
+	if (segment.prescaleEnd.x < svgExtentMin.x) {
+		svgExtentMin.x = segment.prescaleEnd.x;
+	}
+	if (segment.prescaleEnd.y < svgExtentMin.y) {
+		svgExtentMin.y = segment.prescaleEnd.y;
+	}
 }
-
-
 
 void Map::clearStore() {
     for (int i=0; i < pathTypes.size(); i++) {
@@ -63,9 +68,11 @@ void Map::clearStore() {
 
 void Map::loadMap(const string filename) {
     currentMap.loadFile(filename);
-    scaleX = widthM / stoi(ofToString(currentMap.getAttribute("svg", "width", "")));
-    scaleY = heightM / stoi(ofToString(currentMap.getAttribute("svg", "height", "")));
-    
+	scaleX = 1.0;
+	scaleY = 1.0;
+	svgExtentMin = ofVec2f(10000);
+	svgExtentMax = ofVec2f(-10000);
+
     clearStore();
     
     currentMap.pushTag("svg");
@@ -198,12 +205,46 @@ void Map::loadMap(const string filename) {
         currentMap.popTag();
     }
     currentMap.popTag();
+
+	rescaleMap(widthM, heightM, offsetX, offsetY);
+}
+
+void Map::rescaleMap(float width, float height, float newOffsetX, float newOffsetY) {
+	widthM = width;
+	heightM = height;
+
+	float svgWidth = svgExtentMax.x - svgExtentMin.x;
+	float svgHeight = svgExtentMax.y - svgExtentMin.y;
+
+	scaleX = 1.0 / svgWidth * widthM;
+	scaleY = 1.0 / svgHeight * heightM;
+	const ofVec2f scale(scaleX, scaleY);
+
+	offsetX = newOffsetX - svgExtentMin.x * scaleX;
+	offsetY = newOffsetY - svgExtentMin.y * scaleY;
+	const ofVec2f offset(offsetX, offsetY);
+
+	for (auto &path : pathTypes) {
+		if (mapPathStore.find(path) == mapPathStore.end()) {
+			continue;
+		}
+
+		for (auto &mapPath : mapPathStore[path]) {
+			if (mapPath.claimed || mapPath.drawn) {
+				continue;
+			}
+
+			mapPath.segment.start = mapPath.segment.prescaleStart * scale + offset;
+			mapPath.segment.end = mapPath.segment.prescaleEnd * scale + offset;
+		}
+	}
+
 }
 
 MapPath* Map::nextPath(const ofVec2f &pos) {
     MapPath *next = NULL;
     float minDist = INFINITY;
-    
+
     for (auto &path : pathTypes) {
         if (mapPathStore.find(path) == mapPathStore.end()) {
             continue;

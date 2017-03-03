@@ -8,6 +8,7 @@
 
 #include "Robot.h"
 #include "Map.h"
+#include "ArucoMarker.h"
 
 #define PORT 5100
 
@@ -66,10 +67,6 @@ class ofApp : public ofBaseApp{
 private:
 	ofEasyCam cam;
 
-	ofVec3f cameraPos;
-	ofVec3f cameraLook;
-	ofMatrix4x4 cameraToWorld, cameraToWorldInv;
-
 	ofxOscReceiver oscReceiver;
 	ofxJSONElement jsonMsg;
 
@@ -88,6 +85,8 @@ private:
 	ofxDatGuiLabel *stateLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
 	map<int, RobotGui> robotGuis;
+
+	map<int, ArucoMarker> markersById;
     
     Map *currentMap;
 

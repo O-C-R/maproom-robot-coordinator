@@ -14,6 +14,7 @@
 
 typedef struct pathSegment {
 	ofVec2f start, end;
+	ofVec2f prescaleStart, prescaleEnd;
 } pathSegment;
 
 typedef struct MapPath {
@@ -27,6 +28,7 @@ class Map {
 public:
 	Map(float widthM, float heightM, float offsetX, float offsetY);
 	void loadMap(const string filename);
+	void rescaleMap(float widthM, float heightM, float offsetX, float offsetY);
     
 	MapPath* nextPath(const ofVec2f &initial);
     
@@ -39,8 +41,11 @@ public:
     void clearStore();
     
 private:
-	float widthM, heightM, offsetX, offsetY, scaleX, scaleY;
+	float widthM, heightM, offsetX, offsetY;
+	float scaleX, scaleY;
 	vector<MapPath> paths;
+
+	ofVec2f svgExtentMin, svgExtentMax;
 };
 
 #endif
