@@ -1,4 +1,4 @@
-#pragma once
+#pragma once 
 
 #include "ofMain.h"
 #include "ofxDatGui.h"
@@ -31,6 +31,13 @@ typedef struct RobotGui {
 	ofxDatGuiSlider *rotationAngleSlider;
 } RobotGui;
 
+typedef struct PathGui {
+    ofxDatGuiToggle *togglePath;
+    ofxDatGuiFolder *folder;
+    vector<ofxDatGuiButton *> robotSelect;
+    ofxDatGuiDropdown *drawOptions;
+} PathGui;
+
 class ofApp : public ofBaseApp{
 
 	public:
@@ -38,7 +45,7 @@ class ofApp : public ofBaseApp{
 		void update();
 		void draw();
 		void exit();
-
+    
 		void keyPressed(int key);
 		void keyReleased(int key);
 		void mouseMoved(int x, int y );
@@ -54,15 +61,20 @@ class ofApp : public ofBaseApp{
 	void setState(MaproomState newState);
 	string stateString();
 	void updateGui();
-
+    void receiveGuiUpdates();
+    
 	void handleOSC();
 	void receiveFromRobots();
 	void commandRobots();
     
     void loadMap(const string &name);
-    void loadNextPath(Robot* r);
-
+    
 	void unclaimPath(int robotId);
+    
+    // path gui
+    // int dropdown_index, int robot_id
+    map <int, int> dropDownToRobotId;
+
 
 private:
 	ofEasyCam cam;
@@ -82,12 +94,14 @@ private:
 	map<int, int> robotPositionsIdx;
 
 	ofxDatGui *gui;
-	ofxDatGuiLabel *stateLabel;
+    ofxDatGui *pathGui;
+	ofxDatGuiLabel *stateLabel, *pathLabel, *drawnPathLabel, *pathStatusLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
 	map<int, RobotGui> robotGuis;
+	map<int, PathGui> pathGuis;
 
 	map<int, ArucoMarker> markersById;
-    
+
     Map *currentMap;
 
 	MaproomState state;

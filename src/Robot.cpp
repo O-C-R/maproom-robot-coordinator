@@ -8,6 +8,8 @@
 
 #include "Robot.h"
 
+static const bool debugging = true;
+
 static const float kPositionTolerance = 0.005f;
 static const float kRotationTolerance = 3.0f;
 
@@ -84,6 +86,7 @@ Robot::Robot(int rId, int mId, const string &n) :
 	targetLinePID(3200.0, 7, 700)
 {
 	targetLinePID.setMaxIOutput(500.0);
+
 }
 
 void Robot::setCommunication(const string &rIp, int rPort) {
@@ -208,6 +211,7 @@ bool Robot::commsUp() {
 }
 
 bool Robot::cvDetected() {
+    if (debugging) return true;
 	return ofGetElapsedTimef() - lastCameraUpdateTime < kCameraTimeoutSec;
 }
 

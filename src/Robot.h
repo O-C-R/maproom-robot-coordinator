@@ -89,7 +89,7 @@ public:
 	int id;
 	string name;
 	int markerId;
-
+    
 	// State machine
 	RobotState state;
 	float stateStartTime;
@@ -112,7 +112,7 @@ public:
 	ofVec3f imgPos, upVec;
 	float lastCameraUpdateTime;
 	float cvFramerate;
-
+    
 	// Derived from CV
 	ofVec2f planePos, avgPlanePos, slowAvgPlanePos, allAvgPlanePos;
 	ofVec2f planeVel, avgPlaneVel;
@@ -121,7 +121,6 @@ public:
 
 	// debug: visualizing states
 	ofVec2f dirToLine, backToLine, vecToEnd, movement;
-
 };
 
 #endif

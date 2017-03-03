@@ -3,6 +3,7 @@
 //static const string currentFile = "maproom-2017-02-26T04-23-37.025Z.svg";
 //static const string currentFile = "test_case.svg";
 static const string currentFile = "maproom-2017-03-02T19-03-12.993Z.svg";
+static const string filePath = "/Users/dqgorelick/Downloads/";
 static const float kMarkerSize = 0.2032f;
 
 //static const float kMapWidthM = -2.72f;
@@ -12,12 +13,15 @@ static const float kMapHeightM = -2.4f;
 static const float kMapOffsetXM = -kMapWidthM / 2.0 - 0.15;
 static const float kMapOffsetYM = -kMapHeightM / 2.0 - 0.05;
 
+static const bool debugging = false;
+
 static const int kNumPathsToSave = 10000;
 
 static char udpMessage[1024];
 static char buf[1024];
 
 //--------------------------------------------------------------
+
 void ofApp::setup() {
 	ofSetVerticalSync(true);
 	ofSetBackgroundColor(0);
@@ -37,7 +41,7 @@ void ofApp::setup() {
 	robotsByMarker[r02->markerId] = r02;
 	r02->setCommunication("192.168.7.72", 5111);
 
-    // set up GUI
+	// set up GUI
     gui = new ofxDatGui( ofxDatGuiAnchor::TOP_RIGHT );
 	gui->setTheme(new ofxDatGuiThemeMidnight());
 
@@ -71,26 +75,7 @@ void ofApp::setup() {
         rGui.stateLabel = rGui.folder->addLabel(r.stateDescription());
 		rGui.posLabel = rGui.folder->addLabel(r.positionString());
 		rGui.lastMessageLabel = rGui.folder->addLabel("");
-        rGui.enableToggle = rGui.folder->addToggle("Enabled", true);
-        rGui.calibrateButton = rGui.folder->addButton("Calibrate");
-        rGui.advanceButton = rGui.folder->addButton("Skip path");
-        rGui.rotationAngleSlider = rGui.folder->addSlider("Rotation Angle: " + ofToString(r.id), 0, 360, r.rot);
-
-		rGui.enableToggle->onToggleEvent([&r](ofxDatGuiToggleEvent e)  {
-			r.enabled = e.checked;
-		});
-		rGui.calibrateButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
-			r.calibrate();
-		});
-		rGui.advanceButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
-			r.setState(R_DONE_DRAWING);
-		});
-		rGui.rotationAngleSlider->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.targetRot = e.value;
-		});
-
 		rGui.folder->addBreak();
-
 		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
 		rGui.kp->setValue(2500.0);
 		rGui.ki = rGui.folder->addSlider("ki", 0, 100);
@@ -99,6 +84,9 @@ void ofApp::setup() {
 		rGui.kd->setValue(0.0);
 		ofxDatGuiSlider *kiMax = rGui.folder->addSlider("kiMax", 0, 10000);
 		kiMax->setValue(0.0);
+        rGui.advanceButton = rGui.folder->addButton("Skip path");
+        
+        // event listeners
 		rGui.kp->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
 			r.targetLinePID.setP(e.value);
 		});
@@ -111,9 +99,13 @@ void ofApp::setup() {
 		kiMax->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
 			r.targetLinePID.setMaxIOutput(e.value);
 		});
+        rGui.advanceButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
+            r.setState(R_DONE_DRAWING);
+        });
 
 		gui->addBreak();
     }
+    
 
     ofxDatGuiButton *reloadMapButton = gui->addButton("Reset Map");
 	reloadMapButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
@@ -124,8 +116,19 @@ void ofApp::setup() {
 			}
 		}
 	});
-
-
+    
+    ofxDatGuiButton *loadNewMapButton = gui->addButton("Load New Map");
+    loadNewMapButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
+        currentMap->clearStore();
+        string mostRecent = currentMap->getMostRecentMap(filePath);
+        if (mostRecent.size()) {
+            cout << "loading from " << mostRecent << endl;
+            loadMap(mostRecent);
+        } else {
+            loadMap("test.svg");
+        }
+    });
+    
 	gui->addFRM();
 
 	// Listen for messages from camera
@@ -136,11 +139,69 @@ void ofApp::setup() {
 	robotReceiver.Create();
 	robotReceiver.Bind(5101);
 	robotReceiver.SetNonBlocking(true);
-    
+
     currentMap = new Map(kMapWidthM, kMapHeightM, kMapOffsetXM, kMapOffsetYM);
-    loadMap(currentFile);
+
+    string mostRecent = currentMap->getMostRecentMap(filePath);
+    if (mostRecent.size()) {
+        cout << "loading from " << mostRecent << endl;
+        loadMap(mostRecent);
+    } else {
+        loadMap(currentFile);
+    }
 
 	setState(MR_STOPPED);
+    
+    // set up paths gui
+    pathGui = new ofxDatGui( ofxDatGuiAnchor::TOP_LEFT );
+    pathGui->setTheme(new ofxDatGuiThemeMidnight());
+    
+    pathGui->addHeader("Paths GUI");
+    pathLabel = pathGui->addLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
+    pathStatusLabel = pathGui->addLabel("");
+    drawnPathLabel = pathGui->addLabel("");
+    
+    pathGui->addBreak();
+    
+    int dropdown_index;
+    vector<string> opts;
+    for (auto &p : robotsById) {
+        int id = p.first;
+        Robot &r = *p.second;
+        
+        // note: don't change the order of label. datGuiDropdown event handler is broken so we have to parse the string to get the selected ID
+        opts.push_back(ofToString(id) + " ID ROBOT - " + ofToString(r.name));
+        dropDownToRobotId[dropdown_index] = r.id;
+        cout << r.id << endl;
+        cout << "dropDownToRobotId[dropdown_index] " << dropDownToRobotId[dropdown_index] << endl;
+        dropdown_index++;
+    }
+
+    for (int i=0; i<currentMap->pathTypes.size(); i++) {
+        PathGui &pGui = pathGuis[i];
+        
+        string pathName = currentMap->pathTypes[i];
+        
+        pGui.togglePath = pathGui->addToggle("PATH: " + ofToString(pathName) + " \t\t- " + ofToString(currentMap->getPathCount(pathName)));
+        pGui.togglePath->setChecked(true);
+        
+        if (opts.size()) {
+            pGui.drawOptions = pathGui->addDropdown("Select Robot:", opts);
+            // defaults to first robot for all paths
+            // TODO: divy up paths differently?
+            int initial = 0;
+            pGui.drawOptions->select(initial);
+            currentMap->pathAssignment[pathName] = dropDownToRobotId[initial];
+        }
+        
+        pathGui->addBreak();
+        
+        pGui.togglePath->onToggleEvent([this, pathName](ofxDatGuiToggleEvent e) {
+            currentMap->setPathActive(pathName, e.checked);
+        });
+    }
+    
+    pathGui->addFooter();
 }
 
 void ofApp::exit() {
@@ -170,6 +231,7 @@ void ofApp::update(){
 	handleOSC();
 	receiveFromRobots();
 	commandRobots();
+    receiveGuiUpdates();
 	updateGui();
 }
 
@@ -257,7 +319,7 @@ void ofApp::commandRobots() {
 			unclaimPath(id);
 			r.start();
 		} else if (r.state == R_READY_TO_POSITION && state == MR_RUNNING) {
-			MapPath *mp = currentMap->nextPath(r.avgPlanePos);
+			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id);
 			robotPaths[id] = mp;
 
 			if (mp != NULL) {
@@ -291,7 +353,11 @@ void ofApp::commandRobots() {
 				} else {
 					mp->drawn = true;
 					robotPaths.erase(id);
-
+                    if (debugging) {
+                        r.planePos = mp->segment.end;
+                        r.avgPlanePos = mp->segment.end;
+                        r.slowAvgPlanePos = mp->segment.end;
+                    }
 					// TODO: make this a function on robot specifically
 					r.setState(R_READY_TO_POSITION);
 				}
@@ -308,6 +374,7 @@ void ofApp::commandRobots() {
 			gui.stateLabel->setLabel(r.stateDescription());
 			gui.posLabel->setLabel(r.positionString());
 			gui.lastMessageLabel->setLabel(r.lastMessage.length() > 0 ? r.lastMessage : "Unknown");
+
 		}
 
 
@@ -327,10 +394,42 @@ void ofApp::commandRobots() {
 	}
 }
 
+void ofApp::receiveGuiUpdates() {
+    for (int i=0; i<currentMap->pathTypes.size(); i++) {
+        PathGui &pGui = pathGuis[i];
+        ofxDatGuiDropdownOption selected = *pGui.drawOptions->getSelected();
+        
+        int selectedRobot = atoi(ofToString(selected.getLabel()[0]).c_str());
+        currentMap->pathAssignment[currentMap->pathTypes[i]] = selectedRobot;
+    }
+}
+
 void ofApp::updateGui() {
 	char buf[1024];
 	sprintf(buf, "%s (%.2f)", stateString().c_str(), ofGetElapsedTimef() - stateStartTime);
 	stateLabel->setLabel(buf);
+    
+    pathLabel->setLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
+    
+    int activePaths = currentMap->getActivePathCount();
+    int drawnPaths = currentMap->getDrawnPaths();
+    int pathsLeft = activePaths - drawnPaths;
+    float percentage = (activePaths > 0 ? float(drawnPaths / activePaths) : 100);
+    
+    sprintf(buf, "Drawn (active) Paths: %d", drawnPaths);
+    pathStatusLabel->setLabel(buf);
+    
+    sprintf(buf, "Active Paths Remaining %d, percentage drawn: (%.2f)", drawnPaths, percentage);
+    drawnPathLabel->setLabel(buf);
+    
+    static const ofColor enabled(50, 50, 100), disabled(50, 50, 50);
+    
+    for (int i=0; i<currentMap->pathTypes.size(); i++) {
+        PathGui &pGui = pathGuis[i];
+        bool pathActive = currentMap->activePaths[currentMap->pathTypes[i]];
+        pGui.togglePath->setBackgroundColor(pathActive ? enabled : disabled);
+        pGui.drawOptions->setBackgroundColor(pathActive ? enabled : disabled);
+    }
 }
 
 string ofApp::stateString() {
@@ -362,13 +461,16 @@ void ofApp::draw(){
 				ofSetColor(255, 255, 255);
 			} else if (j.claimed) {
 				ofSetColor(200, 0, 200);
-			} else {
+			} else if(!currentMap->activePaths[i.first]) {
+                ofSetColor(0, 0, 0);
+            } else {
 				ofSetColor(50, 50, 50);
 			}
-
+            
             ofDrawLine(j.segment.start, j.segment.end);
         }
     }
+    ofSetLineWidth(1.0);
 
 	// Draw historical positions
 	for (auto &rPos : robotPositions) {
@@ -414,7 +516,7 @@ void ofApp::draw(){
 		Robot &r = *it->second;
 
         // draw current path for the robot:
-		if (r.state == R_DRAWING) {
+		if (r.state == R_DRAWING || debugging) {
 			ofSetColor(255, 255, 0);
 		} else {
 			ofSetColor(0, 0, 255);
