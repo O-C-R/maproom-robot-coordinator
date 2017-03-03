@@ -8,7 +8,7 @@
 
 #include "Robot.h"
 
-static const bool debugging = true;
+static const bool debugging = false;
 
 static const float kPositionTolerance = 0.005f;
 static const float kRotationTolerance = 3.0f;

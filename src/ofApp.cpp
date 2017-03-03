@@ -322,12 +322,13 @@ void ofApp::commandRobots() {
 			unclaimPath(id);
 			r.start();
 		} else if (r.state == R_READY_TO_POSITION && state == MR_RUNNING) {
-			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id);
+			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading);
 			robotPaths[id] = mp;
 
 			if (mp != NULL) {
 				mp->claimed = true;
 				r.navigateTo(mp->segment.start);
+                r.lastHeading = atan2(mp->segment.end.x - mp->segment.start.x, mp->segment.end.y - mp->segment.start.y)*180/3.14159;
 			} else {
 //				cout << "No more paths to draw!" << endl;
 			}

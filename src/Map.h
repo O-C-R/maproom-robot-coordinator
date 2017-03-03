@@ -32,7 +32,7 @@ public:
 	void rescaleMap(float widthM, float heightM, float offsetX, float offsetY);
     string getMostRecentMap(string path);
     
-	MapPath* nextPath(const ofVec2f &initial, int robotId);
+	MapPath* nextPath(const ofVec2f &initial, int robotId, float lastHeading);
     
     ofxXmlSettings currentMap;
     

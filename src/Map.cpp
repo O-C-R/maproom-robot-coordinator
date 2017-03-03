@@ -420,8 +420,9 @@ void Map::rescaleMap(float width, float height, float newOffsetX, float newOffse
     cout << "post optimize count: " << getPathCount() << endl;
 }
 
-MapPath* Map::nextPath(const ofVec2f &pos, int robotId) {
+MapPath* Map::nextPath(const ofVec2f &pos, int robotId, float lastHeading) {
     MapPath *next = NULL;
+    vector<MapPath*> contenders;
     float minDist = INFINITY;
     
     int checkedPath = 0;
@@ -447,17 +448,42 @@ MapPath* Map::nextPath(const ofVec2f &pos, int robotId) {
 
             if (startDist < minDist) {
                 minDist = startDist;
-                next = &mapPath;
+                contenders.clear();
+                contenders.push_back(&mapPath);
             } else if (endDist < minDist) {
                 ofVec2f tmp = mapPath.segment.start;
                 mapPath.segment.start = mapPath.segment.end;
                 mapPath.segment.end = tmp;
-
                 minDist = endDist;
-                next = &mapPath;
+                contenders.clear();
+                contenders.push_back(&mapPath);
+            } else if (endDist == minDist) {
+                contenders.push_back(&mapPath);
+            } else if (startDist == minDist) {
+                ofVec2f tmp = mapPath.segment.start;
+                mapPath.segment.start = mapPath.segment.end;
+                mapPath.segment.end = tmp;
+                contenders.push_back(&mapPath);
             }
         }
     }
-	return next;
+    if (contenders.size() > 1) {
+        // pick path with heading closest to last path
+        float minAngleDiff = INFINITY;
+        for (int i=0; i<contenders.size(); i++) {
+            MapPath p = *contenders[i];
+            float angle = getAngle(p.segment.start, p.segment.end);
+            float angleDiff = abs(fmod(((angle+360)-(lastHeading+360)), 360.0));
+            if (angleDiff < minAngleDiff) {
+                minAngleDiff = angleDiff;
+                next = contenders[i];
+            }
+        }
+        return next;
+    } else if (contenders.size() == 1) {
+        return contenders[0];
+    } else {
+     	return next;
+    }
 }
 

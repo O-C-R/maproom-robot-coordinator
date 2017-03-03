@@ -121,6 +121,9 @@ public:
 
 	// debug: visualizing states
 	ofVec2f dirToLine, backToLine, vecToEnd, movement;
+    
+    // used for map next path
+    float lastHeading;
 };
 
 #endif
