@@ -50,11 +50,12 @@ public:
 	void gotHeartbeat();
 
 	// Update from CV
-	void updateCamera(const ofVec2f &imPos, const ofVec2f &imUp, const ofVec2f &opticalCenter, const ofVec2f &opticalScale);
+	void updateCamera(const ofVec2f &imPos, const ofVec2f &imUp);
 
 	// Update during loop
 	void update();
 	void setState(RobotState newState);
+	void updatePID(float kp, float ki, float kd, float maxI);
 
 	// States
 	void moveRobot(char *msg, bool drawing, bool &shouldSend);
@@ -97,7 +98,11 @@ public:
 	// Targets
 	float targetRot;
 	ofVec2f startPlanePos, targetPlanePos;
+
+	// PID
+	float minSpeed, maxSpeed, speedRamp;
 	MiniPID targetLinePID;
+	float targetLineKp, targetLineKi, targetLineKd, targetLineMaxI;
 
 	// Communication
 	bool enabled;

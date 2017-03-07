@@ -4,17 +4,16 @@
 static const string currentFile = "test.svg";
 //static const string currentFile = "maproom-2017-03-02T19-03-12.993Z.svg";
 static const string filePath = "/Users/anderson/Downloads/";
-static const float kRobotSize = 0.2032f;
 
-static const float kMapWidthM = -1.0f;
-static const float kMapHeightM = -1.0f;
+static const float kMapWidthM = 1.0f;
+static const float kMapHeightM = 1.0f;
 static const float kMapOffsetXM = -kMapWidthM / 2.0;
 static const float kMapOffsetYM = -kMapHeightM / 2.0;
-
-static const ofVec2f kOpticalCenter(-0.003, 0.12);
-static const ofVec2f kOpticalScale(0.924, 0.939);
+static const ofRectangle kCropBox(ofVec2f(-0.5, -0.4), ofVec2f(0.5, 0.4));
 
 static const bool debugging = false;
+
+static const float kRobotSafetyDiameterM = 0.75f;
 
 static const int kNumPathsToSave = 10000;
 
@@ -32,15 +31,20 @@ void ofApp::setup() {
 	cam.setTarget(ofVec3f(0.0));
 	cam.setNearClip(0.01);
 
-	Robot *r01 = new Robot(1, 23, "Delmar");
-	robotsById[r01->id] = r01;
-	robotsByMarker[r01->markerId] = r01;
-	r01->setCommunication("192.168.7.70", 5111);
+//	Robot *r01 = new Robot(1, 30, "Delmar");
+//	robotsById[r01->id] = r01;
+//	robotsByMarker[r01->markerId] = r01;
+//	r01->setCommunication("192.168.7.70", 5111);
 
-	Robot *r02 = new Robot(2, 24, "Archie");
+	Robot *r02 = new Robot(2, 26, "Archie");
 	robotsById[r02->id] = r02;
 	robotsByMarker[r02->markerId] = r02;
-	r02->setCommunication("192.168.7.72", 5111);
+	r02->setCommunication("192.168.7.73", 5111);
+
+//	Robot *r03 = new Robot(3, 26, "Camille");
+//	robotsById[r03->id] = r03;
+//	robotsByMarker[r03->markerId] = r03;
+//	r03->setCommunication("192.168.7.71", 5111);
 
 	// set up GUI
     gui = new ofxDatGui( ofxDatGuiAnchor::TOP_RIGHT );
@@ -63,17 +67,6 @@ void ofApp::setup() {
 		setState(MR_STOPPED);
 	});
 
-//	gui->addBreak();
-//
-//	opticalCenterXSlider = gui->addSlider("opticalCenterX", -1.0, 1.0);
-//	opticalCenterXSlider->setValue(-0.2);
-//	opticalCenterYSlider = gui->addSlider("opticalCenterY", -1.0, 3.0);
-//	opticalCenterYSlider->setValue(1.2);
-//	opticalScaleXSlider = gui->addSlider("opticalScaleX", 8.5, 10.0);
-//	opticalScaleXSlider->setValue(9.3);
-//	opticalScaleYSlider = gui->addSlider("opticalScaleY", 8.5, 10.0);
-//	opticalScaleYSlider->setValue(9.3);
-
 	gui->addBreak();
     
     for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
@@ -88,29 +81,45 @@ void ofApp::setup() {
 		rGui.posLabel = rGui.folder->addLabel(r.positionString());
 		rGui.lastMessageLabel = rGui.folder->addLabel("");
 		rGui.folder->addBreak();
-//		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
-//		rGui.kp->setValue(2500.0);
-//		rGui.ki = rGui.folder->addSlider("ki", 0, 100);
-//		rGui.ki->setValue(0.0);
-//		rGui.kd = rGui.folder->addSlider("kd", 0, 10000);
-//		rGui.kd->setValue(0.0);
-//		ofxDatGuiSlider *kiMax = rGui.folder->addSlider("kiMax", 0, 10000);
-//		kiMax->setValue(0.0);
+		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
+		rGui.kp->setValue(r.targetLineKp);
+		rGui.ki = rGui.folder->addSlider("ki", 0, 100);
+		rGui.ki->setValue(r.targetLineKi);
+		rGui.kd = rGui.folder->addSlider("kd", 0, 10000);
+		rGui.kd->setValue(r.targetLineKd);
+		rGui.kMaxI = rGui.folder->addSlider("kMaxI", 0, 10000);
+		rGui.kMaxI->setValue(r.targetLineMaxI);
+		rGui.folder->addBreak();
+		rGui.minSpeed = rGui.folder->addSlider("minSpeed", 0, 1024);
+		rGui.minSpeed->setValue(r.minSpeed);
+		rGui.minSpeed->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+			r.minSpeed = e.value;
+		});
+		rGui.maxSpeed = rGui.folder->addSlider("maxSpeed", 0, 1024);
+		rGui.maxSpeed->setValue(r.maxSpeed);
+		rGui.maxSpeed->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+			r.maxSpeed = e.value;
+		});
+		rGui.speedRamp = rGui.folder->addSlider("speedRamp", 0, 1);
+		rGui.speedRamp->setValue(r.speedRamp);
+		rGui.speedRamp->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
+			r.speedRamp = e.value;
+		});
         rGui.advanceButton = rGui.folder->addButton("Skip path");
-        
+
+		auto pidListener = [&rGui, &r](ofxDatGuiSliderEvent e) {
+			r.updatePID(rGui.kp->getValue(),
+						rGui.ki->getValue(),
+						rGui.kd->getValue(),
+						rGui.kMaxI->getValue());
+		};
+
         // event listeners
-//		rGui.kp->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-//			r.targetLinePID.setP(e.value);
-//		});
-//		rGui.ki->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-//			r.targetLinePID.setI(e.value);
-//		});
-//		rGui.kd->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-//			r.targetLinePID.setD(e.value);
-//		});
-//		kiMax->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-//			r.targetLinePID.setMaxIOutput(e.value);
-//		});
+		rGui.kp->onSliderEvent(pidListener);
+		rGui.ki->onSliderEvent(pidListener);
+		rGui.kd->onSliderEvent(pidListener);
+		rGui.kMaxI->onSliderEvent(pidListener);
+
         rGui.advanceButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
             r.setState(R_DONE_DRAWING);
         });
@@ -152,8 +161,7 @@ void ofApp::setup() {
 	robotReceiver.Bind(5101);
 	robotReceiver.SetNonBlocking(true);
 
-	ofRectangle cropBox(ofVec2f(-0.4), ofVec2f(0.4));
-    currentMap = new Map(kMapWidthM, kMapHeightM, kMapOffsetXM, kMapOffsetYM, cropBox);
+    currentMap = new Map(kMapWidthM, kMapHeightM, kMapOffsetXM, kMapOffsetYM, kCropBox);
 
     string mostRecent = currentMap->getMostRecentMap(filePath);
     if (mostRecent.size()) {
@@ -298,15 +306,17 @@ void ofApp::handleOSC() {
 				int markerId = jsonMsg["ids"][i].asInt();
 				ofVec2f pos(jsonMsg["pos"][i][0].asFloat(), jsonMsg["pos"][i][1].asFloat());
 				ofVec2f up(jsonMsg["up"][i][0].asFloat(), jsonMsg["up"][i][1].asFloat());
+				ofVec2f rawPos(jsonMsg["raw_pos"][i][0].asFloat(), jsonMsg["raw_pos"][i][1].asFloat());
+				ofVec2f rawUp(jsonMsg["raw_up"][i][0].asFloat(), jsonMsg["raw_up"][i][1].asFloat());
 
 				if (robotsByMarker.find(markerId) != robotsByMarker.end()) {
-					robotsByMarker[markerId]->updateCamera(pos, up, kOpticalCenter, kOpticalScale);
+					robotsByMarker[markerId]->updateCamera(pos, up);
 				}
 
 				if (markersById.find(markerId) == markersById.end()) {
 					markersById[markerId] = ArucoMarker(markerId);
 				}
-				markersById[markerId].updateCamera(pos, up);
+				markersById[markerId].updateCamera(rawPos, rawUp);
 			}
 		}
 	}

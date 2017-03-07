@@ -113,14 +113,13 @@ void Map::storePath(string lineType, float startX, float startY, float destX, fl
 	segment.prescaleStart = ofVec2f(startX, startY);
 	segment.prescaleEnd = ofVec2f(destX, destY);
     
-    MapPath toStore = {false, false, lineType, segment};
+    MapPath toStore = {storeCount++, false, false, lineType, segment};
 
 	if (!mapPathStore[lineType].size()) {
 		pathTypes.push_back(lineType);
 		activePaths[lineType] = true;
 	}
 	mapPathStore[lineType].push_back(toStore);
-	storeCount++;
 
 	if (segment.prescaleStart.x > svgExtentMax.x) {
 		svgExtentMax.x = segment.prescaleStart.x;
@@ -276,7 +275,7 @@ void Map::optimizePaths(float percentDiff) {
                                 mapPathStore[type][i].segment.end = mapPathStore[type][j].segment.start;
                             }
 
-                            cout << "similar degrees" << endl;
+//                            cout << "similar degrees" << endl;
                             mapPathStore[type][j].claimed = true;
                             toRemoveCount++;
 //                            break;
@@ -510,31 +509,33 @@ void Map::rescaleMap(float width, float height, float newOffsetX, float newOffse
 			mapPath.segment.end = mapPath.segment.prescaleEnd * scale + offset;
 
 			bool success = CohenSutherlandLineClip(mapPath.segment.start, mapPath.segment.end, cropBox);
-//			if (!success) {
-//				mapPath.claimed = true;
-//				mapPath.drawn = true;
-//			}
 
-			if (!success)
-			{
-				mapPathIt = mapPathStore[path].erase(mapPathIt);
+			static const float kEpsilon = 0.005;
+			for (auto &otherMapPath : mapPathStore[path]) {
+				if (otherMapPath.id == mapPath.id) {
+					continue;
+				}
+
+				if ((mapPath.segment.start.distance(otherMapPath.segment.start) < kEpsilon && mapPath.segment.end.distance(otherMapPath.segment.end) < kEpsilon)
+					|| (mapPath.segment.start.distance(otherMapPath.segment.end) < kEpsilon && mapPath.segment.end.distance(otherMapPath.segment.start) < kEpsilon)) {
+					success = false;
+					break;
+				}
 			}
-			else
-			{
+
+			if (!success) {
+				mapPathIt = mapPathStore[path].erase(mapPathIt);
+			} else {
 				++mapPathIt;
 			}
 		}
-
-		for (auto &mapPath : mapPathStore[path]) {
-
-		}
 	}
     
-    cout << "pre optimize count: " << getPathCount() << endl;
-    cout << "optimize SVG" << endl;
-    float optPercent = 6;
-    optimizePaths(optPercent);
-    cout << "post optimize count: " << getPathCount() << endl;
+//    cout << "pre optimize count: " << getPathCount() << endl;
+//    cout << "optimize SVG" << endl;
+//    float optPercent = 6;
+//    optimizePaths(optPercent);
+//    cout << "post optimize count: " << getPathCount() << endl;
 }
 
 MapPath* Map::nextPath(const ofVec2f &pos, int robotId, float lastHeading) {
@@ -568,18 +569,12 @@ MapPath* Map::nextPath(const ofVec2f &pos, int robotId, float lastHeading) {
                 contenders.clear();
                 contenders.push_back(&mapPath);
             } else if (endDist < minDist) {
-//                ofVec2f tmp = mapPath.segment.start;
-//                mapPath.segment.start = mapPath.segment.end;
-//                mapPath.segment.end = tmp;
                 minDist = endDist;
                 contenders.clear();
                 contenders.push_back(&mapPath);
             } else if (abs(endDist-minDist) < 0.0001) {
                 contenders.push_back(&mapPath);
             } else if (abs(startDist-minDist) < 0.0001) {
-//                ofVec2f tmp = mapPath.segment.start;
-//                mapPath.segment.start = mapPath.segment.end;
-//                mapPath.segment.end = tmp;
                 contenders.push_back(&mapPath);
             }
         }

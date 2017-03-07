@@ -20,6 +20,7 @@ typedef struct pathSegment {
 } pathSegment;
 
 typedef struct MapPath {
+	int id;
     bool claimed, drawn;
 
     string type;

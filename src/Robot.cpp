@@ -71,6 +71,9 @@ Robot::Robot(int rId, int mId, const string &n) :
 	avgPlanePos(0, 0),
 	slowAvgPlanePos(0, 0),
 	allAvgPlanePos(0, 0),
+	minSpeed(128),
+	maxSpeed(512),
+	speedRamp(0.25),
 	planeVel(0, 0),
 	avgPlaneVel(0, 0),
 	targetRot(0),
@@ -83,10 +86,24 @@ Robot::Robot(int rId, int mId, const string &n) :
 	lastCameraUpdateTime(-1000),
 	cvFramerate(0),
 	lastHeartbeatTime(-1000),
-	targetLinePID(3200.0, 7, 700)
+	targetLineKp(3200.0),
+	targetLineKi(7),
+	targetLineKd(700),
+	targetLineMaxI(500.0),
+	targetLinePID(targetLineKp, targetLineKi, targetLineKd)
 {
-	targetLinePID.setMaxIOutput(500.0);
+	targetLinePID.setMaxIOutput(targetLineMaxI);
 
+}
+
+void Robot::updatePID(float kp, float ki, float kd, float maxI) {
+	targetLineKp = kp;
+	targetLineKi = kd;
+	targetLineKd = ki;
+	targetLineMaxI = maxI;
+
+	targetLinePID.setPID(kp, kd, ki);
+	targetLinePID.setMaxIOutput(targetLineMaxI);
 }
 
 void Robot::setCommunication(const string &rIp, int rPort) {
@@ -168,11 +185,11 @@ string Robot::stateString() {
 	}
 }
 
-void Robot::updateCamera(const ofVec2f &imPos, const ofVec2f &imUp, const ofVec2f &opticalCenter, const ofVec2f &opticalScale) {
+void Robot::updateCamera(const ofVec2f &imPos, const ofVec2f &imUp) {
 	imgPos = imPos;
 	upVec = imUp;
 
-	ofVec2f newPlanePos = (imPos - opticalCenter) * opticalScale + opticalCenter;
+	ofVec2f newPlanePos = imPos;
 	glRot = atan2(imUp.y, imUp.x);
 	rot = ofRadToRobotDeg(glRot);
 
@@ -206,8 +223,7 @@ void Robot::gotHeartbeat() {
 }
 
 bool Robot::commsUp() {
-    return true;
-//	return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
+	return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
 }
 
 bool Robot::cvDetected() {
@@ -230,7 +246,7 @@ void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 
 	// Calculate where and how fast we'd go to just get to the end
 	const float distanceToEnd = currentToEnd.length();
-	float forwardMag = ofMap(distanceToEnd, 0, 1, 50, 250, true);
+	float forwardMag = ofMap(distanceToEnd, 0, speedRamp, minSpeed, maxSpeed, true);
 	const ofVec2f currentToEndDir = (line.dot(currentToEnd) / line.lengthSquared() * line).normalize();
 	vecToEnd = currentToEndDir * forwardMag;
 
