@@ -71,9 +71,9 @@ Robot::Robot(int rId, int mId, const string &n) :
 	avgPlanePos(0, 0),
 	slowAvgPlanePos(0, 0),
 	allAvgPlanePos(0, 0),
-	minSpeed(128),
+	minSpeed(100),
 	maxSpeed(512),
-	speedRamp(0.25),
+	speedRamp(0.1),
 	planeVel(0, 0),
 	avgPlaneVel(0, 0),
 	targetRot(0),
@@ -86,10 +86,10 @@ Robot::Robot(int rId, int mId, const string &n) :
 	lastCameraUpdateTime(-1000),
 	cvFramerate(0),
 	lastHeartbeatTime(-1000),
-	targetLineKp(3200.0),
-	targetLineKi(7),
-	targetLineKd(700),
-	targetLineMaxI(500.0),
+	targetLineKp(20000.0),
+	targetLineKi(500),
+	targetLineKd(0),
+	targetLineMaxI(5000.0),
 	targetLinePID(targetLineKp, targetLineKi, targetLineKd)
 {
 	targetLinePID.setMaxIOutput(targetLineMaxI);
@@ -397,10 +397,10 @@ void Robot::update() {
         cmdStop(msg);
         shouldSend = true;
 
-        if (elapsedStateTime > 0.5f && !inPosition(avgPlanePos)) {
+        if (elapsedStateTime > 0.15f && !inPosition(avgPlanePos)) {
 			// Go back, we're out of position.
             setState(R_POSITIONING);
-        } else if (elapsedStateTime > 1.5f) {
+        } else if (elapsedStateTime > 0.3f) {
 			// We've waited long enough, start drawing.
             setState(R_READY_TO_DRAW);
         }
@@ -430,4 +430,12 @@ void Robot::update() {
 	if (mustSend || (shouldSend && ofGetFrameNum() % 4 == 0)) {
 		sendMessage(msg);
 	}
+}
+
+void Robot::addPathType(const string &pathType) {
+	pathTypes.insert(pathType);
+}
+
+void Robot::removePathType(const string &pathType) {
+	pathTypes.erase(find(pathTypes.begin(), pathTypes.end(), pathType));
 }

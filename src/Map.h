@@ -34,7 +34,7 @@ public:
 	void rescaleMap(float widthM, float heightM, float offsetX, float offsetY);
     string getMostRecentMap(string path);
     
-	MapPath* nextPath(const ofVec2f &initial, int robotId, float lastHeading);
+	MapPath* nextPath(const ofVec2f &initial, int robotId, float lastHeading, const set<string> &pathTypes);
     
     ofxXmlSettings currentMap;
     
@@ -52,10 +52,9 @@ public:
     int getActivePathCount();
     int getDrawnPaths();
     int getPathCount(string type);
-    
-    map<string, int> pathAssignment;
 private:
 	float widthM, heightM, offsetX, offsetY;
+	float origOffsetX, origOffsetY;
 	float scaleX, scaleY;
 	vector<MapPath> paths;
 

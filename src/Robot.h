@@ -82,6 +82,10 @@ public:
     void testRotate(float angle);
     void testMove(float direction, float magnitude);
 
+	// Paths
+	void addPathType(const string &pathType);
+	void removePathType(const string &pathType);
+
 // --------------------------------------
 // -------------- DATA ------------------
 // --------------------------------------
@@ -128,6 +132,7 @@ public:
 	ofVec2f dirToLine, backToLine, vecToEnd, movement;
     
     // used for map next path
+	set<string> pathTypes;
     float lastHeading;
 };
 
