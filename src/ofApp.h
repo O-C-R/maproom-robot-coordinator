@@ -81,6 +81,7 @@ private:
 	ofEasyCam cam;
 
 	ofxOscReceiver oscReceiver;
+	ofxOscSender oscToRPi;
 	ofxJSONElement jsonMsg;
 
 	ofxUDPManager robotReceiver;
@@ -99,6 +100,7 @@ private:
     ofxDatGui *pathGui;
 	ofxDatGuiLabel *stateLabel, *pathLabel, *drawnPathLabel, *pathStatusLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
+	ofxDatGuiDropdown *rpiStateDropdown;
 	map<int, RobotGui> robotGuis;
 	map<int, PathGui> pathGuis;
 

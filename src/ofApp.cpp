@@ -1,15 +1,16 @@
 #include "ofApp.h"
 
-//static const string currentFile = "maproom-2017-02-26T04-23-37.025Z.svg";
 static const string currentFile = "test.svg";
-//static const string currentFile = "maproom-2017-03-02T19-03-12.993Z.svg";
 static const string filePath = "/Users/anderson/Downloads/";
+
+static const string kRPiHost = "127.0.0.1";
+static const int kRPiPort = 5300;
 
 static const float kMapWidthM = 1.0f;
 static const float kMapHeightM = 1.0f;
 static const float kMapOffsetXM = -kMapWidthM / 2.0;
 static const float kMapOffsetYM = -kMapHeightM / 2.0;
-static const ofRectangle kCropBox(ofVec2f(-0.5, -0.4), ofVec2f(0.5, 0.4));
+static const ofRectangle kCropBox(ofVec2f(-0.45, -0.4), ofVec2f(0.45, 0.4));
 
 static const bool debugging = false;
 
@@ -65,6 +66,16 @@ void ofApp::setup() {
 	});
 	stopButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
 		setState(MR_STOPPED);
+	});
+
+	rpiStateDropdown = gui->addDropdown("RPi State", { "Tracking", "Flashlight" });
+	rpiStateDropdown->select(0);
+	rpiStateDropdown->onDropdownEvent([this](ofxDatGuiDropdownEvent e) {
+		int index = e.target->getSelected()->getIndex();
+		ofxOscMessage m;
+		m.setAddress("/state");
+		m.addIntArg(index);
+		oscToRPi.sendMessage(m, false);
 	});
 
 	gui->addBreak();
@@ -154,6 +165,8 @@ void ofApp::setup() {
 
 	// Listen for messages from camera
 	oscReceiver.setup( PORT );
+
+	oscToRPi.setup(kRPiHost, kRPiPort);
 
 	// Listen for messages from the robots
 
