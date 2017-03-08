@@ -6,9 +6,12 @@
 #include "ofxUDPManager.h"
 #include "ofxJSON.h"
 
+#include "VecExt.h"
+
 #include "Robot.h"
 #include "Map.h"
 #include "ArucoMarker.h"
+#include "PathPlanner.h"
 
 #define PORT 5100
 
@@ -76,6 +79,8 @@ class ofApp : public ofBaseApp{
     // int dropdown_index, int robot_id
     map <int, int> dropDownToRobotId;
 
+	void planRobotPaths();
+
 
 private:
 	ofEasyCam cam;
@@ -87,6 +92,7 @@ private:
 	ofxUDPManager robotReceiver;
 	char robotMessage[1024];
 
+	vector<int> robotIds;
 	map<int, Robot*> robotsById;
 	map<int, Robot*> robotsByMarker;
 	map<int, MapPath*> robotPaths;

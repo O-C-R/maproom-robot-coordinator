@@ -18,8 +18,22 @@ static const float kRobotSafetyDiameterM = 0.75f;
 
 static const int kNumPathsToSave = 10000;
 
+static const ofVec2i kNumGridPtsPerAxis(10, 10);
+static const ofVec2f kCellSize(kCropBox.width / kNumGridPtsPerAxis.x, kCropBox.height / kNumGridPtsPerAxis.y);
+
 static char udpMessage[1024];
 static char buf[1024];
+
+// centered
+inline ofVec2f pathPtToPlanePt(ofVec2i pathPt) {
+	return ofVec2f(pathPt.x * kCellSize.x,
+				   pathPt.y * kCellSize.y) + kCellSize / 2.0;
+}
+
+inline ofVec2i planePtToPathPt(ofVec2f planePt) {
+	return ofVec2i(floor(planePt.x / kCropBox.width * kNumGridPtsPerAxis.x),
+				   floor(planePt.y / kCropBox.height * kNumGridPtsPerAxis.y));
+}
 
 //--------------------------------------------------------------
 
@@ -41,6 +55,7 @@ void ofApp::setup() {
 	robotsById[r02->id] = r02;
 	robotsByMarker[r02->markerId] = r02;
 	r02->setCommunication("192.168.7.73", 5111);
+	robotIds.push_back(r02->id);
 
 //	Robot *r03 = new Robot(3, 26, "Camille");
 //	robotsById[r03->id] = r03;
@@ -345,6 +360,157 @@ void ofApp::unclaimPath(int robotId) {
 	}
 }
 
+void ofApp::planRobotPaths() {
+	PathPlanner pathPlanner(kNumGridPtsPerAxis.x, kNumGridPtsPerAxis.y);
+
+	// First, add robot positions
+	for (int robotId : robotIds) {
+		Robot &r = *robotsById[robotId];
+
+		r.needsReplan = false;
+		ofVec2i currentCell = planePtToPathPt(r.planePos);
+		if (pathPlanner.at(currentCell).containsRobotId >= 0) {
+			cout << "Cell contains two robots!!!" << endl;
+		} else {
+			pathPlanner.at(currentCell).containsRobotId = robotId;
+		}
+	}
+
+	// Next, add robot drawing
+	for (int robotId : robotIds) {
+		Robot &r = *robotsById[robotId];
+
+		if (r.state == R_WAITING_TO_DRAW) {
+			for (ofVec2i &pt : r.drawPathMask) {
+				if (pathPlanner.at(pt).onDrawPathForRobotId >= 0 && pathPlanner.at(pt).onDrawPathForRobotId != robotId) {
+					r.needsReplan = true;
+				} else {
+					pathPlanner.at(pt).onDrawPathForRobotId = robotId;
+				}
+			}
+		} else if (r.state == R_DRAWING) {
+			for (ofVec2i &pt : r.drawPathMask) {
+				if (pathPlanner.at(pt).onDrawPathForRobotId >= 0 && pathPlanner.at(pt).onDrawPathForRobotId != robotId) {
+					r.stop();
+					cout << "Going to draw into another robot!!" << endl;
+				} else {
+					pathPlanner.at(pt).onDrawPathForRobotId = robotId;
+				}
+			}
+		}
+	}
+
+		//			static const int linear = 50;
+		//			static const int radial = 8;
+		//			ofVec2f cur = r.startPlanePos;
+		//			ofVec2f target = r.targetPlanePos;
+		//			ofVec2f diff = target - cur / (linear - 1);
+		//			for (int i = 0; i < linear + 1; ++i) {
+		//				for (int j = 0; j < radial; ++j) {
+		//					ofVec2f rad = cur + ofVec2f(0.25f).rotate(360.0 * j / radial);
+		//					ofVec2i currentCell = planePtToPathPt(rad);
+		//
+		//					if (pathPlanner.at(currentCell).onDrawPathForRobotId >= 0 ||
+		//						pathPlanner.at(currentCell).containsRobotId >= 0) {
+		//						cout << "Drawing path contains a robot or another robot's drawing path!" << endl;
+		//					}
+		//
+		//					pathPlanner.at(currentCell).onDrawPathForRobotId = robotId;
+		//				}
+		//				cur += diff;
+		//			}
+
+	// Add next paths
+	for (int robotId : robotIds) {
+		Robot &r = *robotsById[robotId];
+
+		if (r.state == R_POSITIONING) {
+			ofVec2i nextCell = r.path[r.pathIdx];
+			if (pathPlanner.at(nextCell).containsRobotId >= 0) {
+				if (pathPlanner.at(nextCell).containsRobotId > robotId) {
+					r.setState(R_WAITING_TO_POSITION);
+				} else {
+					r.needsReplan = true;
+				}
+			} else if (pathPlanner.at(nextCell).nextPathForRobotId >= 0) {
+				r.needsReplan = true;
+			} else {
+				pathPlanner.at(nextCell).nextPathForRobotId = robotId;
+			}
+		}
+	}
+
+	// Find paths
+	for (auto &p : robotsById) {
+		int id = p.first;
+		Robot &r = *p.second;
+
+		if (r.state == R_READY_TO_POSITION) {
+			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading);
+			robotPaths[id] = mp;
+
+			if (r.path.size() > 0) {
+				// We're on a path, keep going.
+				if (r.pathIdx == r.path.size() - 1) {
+					// We made it to the end of the path, go to the real target
+					r.navigateTo(mp->segment.start);
+				} else {
+					r.navigateTo(pathPtToPlanePt(r.path[r.pathIdx]));
+				}
+			} else {
+				// TODO: find a path!
+			}
+		} else if (r.state == R_DONE_POSITIONING) {
+			if (r.path.size() > 0) {
+				if (r.pathIdx == r.path.size() - 1) {
+					MapPath *mp = robotPaths[id];
+					if (mp == NULL) {
+						r.stop();
+						r.setState(R_READY_TO_POSITION);
+					} else {
+						r.drawLine(mp->segment.start, mp->segment.end);
+					}
+				} else {
+					r.setState(R_READY_TO_POSITION);
+				}
+			} else {
+				cout << "Error: finished positioning without a path somehow" << endl;
+			}
+		} else if (r.state == R_DONE_DRAWING) {
+			if (robotPaths.find(id) == robotPaths.end()) {
+				// Error!
+				r.stop();
+			} else {
+				MapPath *mp = robotPaths[id];
+				if (mp == NULL) {
+					// error!
+					r.stop();
+				} else {
+					mp->drawn = true;
+					robotPaths.erase(id);
+					if (debugging) {
+						r.planePos = mp->segment.end;
+						r.avgPlanePos = mp->segment.end;
+						r.slowAvgPlanePos = mp->segment.end;
+					}
+					// TODO: make this a function on robot specifically
+					r.setState(R_READY_TO_POSITION);
+				}
+			}
+		}
+
+		ofVec2i current = planePtToPathPt(r.planePos);
+		ofVec2i target = planePtToPathPt(r.finalTarget);
+
+		vector<ofVec2i> path = pathPlanner.findPath(current, target);
+		if (path.size() > 0) {
+			r.path = path;
+		} else {
+			// No path!
+		}
+	}
+}
+
 void ofApp::commandRobots() {
 	for (auto &p : robotsById) {
 		int id = p.first;
@@ -374,7 +540,7 @@ void ofApp::commandRobots() {
 			} else {
 				cout << "No more paths to draw!" << endl;
 			}
-		} else if (r.state == R_READY_TO_DRAW && state == MR_RUNNING) {
+		} else if (r.state == R_DONE_POSITIONING && state == MR_RUNNING) {
 			if (robotPaths.find(id) == robotPaths.end()) {
 				// Error!
 				r.stop();
@@ -565,6 +731,20 @@ void ofApp::draw(){
 	for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
 		int robotId = it->first;
 		Robot &r = *it->second;
+
+		if (robotId == 1) {
+			ofSetColor(255, 255, 0);
+		} else if (robotId == 2) {
+			ofSetColor(0, 255, 255);
+		} else if (robotId == 3) {
+			ofSetColor(255, 0, 0);
+		}
+		for (auto &waypoint : r.path) {
+//			float gridSize = 1.0 / float(kNumGridPtsPerAxis);
+//			ofVec2f planePt = ofVec2f(waypoint.x, waypoint.y) * gridSize + ofVec2f(gridSize / 2.0) - 0.5;
+
+//			ofDrawRectangle(planePt - ofVec2f(gridSize * 0.4), gridSize * 0.8, gridSize * 0.8);
+		}
 
         // draw current path for the robot:
 		if (r.state == R_DRAWING || debugging) {

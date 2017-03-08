@@ -12,6 +12,8 @@
 #include "ofMain.h"
 #include "ofxUDPManager.h"
 #include "MiniPID.h"
+#include "VecExt.h"
+#include "Map.h"
 
 static const float kMetersPerInch = 0.0254;
 static const float kMarkerSizeIn = 5.0;
@@ -24,13 +26,20 @@ typedef enum RobotState {
 	R_ROTATING_TO_ANGLE,
 	R_WAITING_ANGLE,
 	R_READY_TO_POSITION,
+	R_WAITING_TO_POSITION,
 	R_POSITIONING,
     R_WAIT_AFTER_POSITION,
-    R_READY_TO_DRAW,
+    R_DONE_POSITIONING,
+	R_WAITING_TO_DRAW,
 	R_DRAWING,
     R_DONE_DRAWING,
 	R_STOPPED
 } RobotState;
+
+typedef enum RobotPathState {
+	RP_NONE,
+	RP_WAITING
+};
 
 typedef enum PenState {
 	P_UNKNOWN,
@@ -98,6 +107,14 @@ public:
 	// Targets
 	float targetRot;
 	ofVec2f startPlanePos, targetPlanePos;
+
+	// Path planning
+	MapPath *claimedMp;
+	bool needsReplan;
+	ofVec2f finalTarget;
+	vector<ofVec2i> path;
+	int pathIdx;
+	vector<ofVec2i> drawPathMask;
 
 	// PID
 	float minSpeed, maxSpeed, speedRamp;

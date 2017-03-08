@@ -164,13 +164,17 @@ string Robot::stateString() {
 			return "ROTATING_TO_ANGLE";
 		case R_WAITING_ANGLE:
 			return "R_WAITING_ANGLE";
+		case R_WAITING_TO_POSITION:
+			return "R_WAITING_TO_POSITION";
 		case R_READY_TO_POSITION:
 			return "R_READY_TO_POSITION";
 		case R_POSITIONING:
 			return "R_POSITIONING";
 		case R_WAIT_AFTER_POSITION:
 			return "R_WAIT_AFTER_POSITION";
-		case R_READY_TO_DRAW:
+		case R_DONE_POSITIONING:
+			return "R_DONE_POSITIONING";
+		case R_WAITING_TO_DRAW:
 			return "R_WAITING_TO_DRAW";
 		case R_DRAWING:
 			return "R_DRAWING";
@@ -402,9 +406,9 @@ void Robot::update() {
             setState(R_POSITIONING);
         } else if (elapsedStateTime > 1.5f) {
 			// We've waited long enough, start drawing.
-            setState(R_READY_TO_DRAW);
+            setState(R_DONE_POSITIONING);
         }
-    } else if (state == R_READY_TO_DRAW) {
+    } else if (state == R_DONE_POSITIONING) {
         // Pass - wait to be sent to drawing.
 		cmdStop(msg, false);
 		shouldSend = true;
