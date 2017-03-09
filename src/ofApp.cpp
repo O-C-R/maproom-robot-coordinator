@@ -21,6 +21,7 @@ static const float kRobotOuterSafetyDiameterM = 0.25f;
 static const int kNumPathsToSave = 10000;
 
 static const ofVec2i kNumGridPtsPerAxis(10, 10);
+static const ofVec2f kGridStart = kCropBox.position;
 static const ofVec2f kCellSize(kCropBox.width / kNumGridPtsPerAxis.x, kCropBox.height / kNumGridPtsPerAxis.y);
 
 static char udpMessage[1024];
@@ -28,13 +29,12 @@ static char buf[1024];
 
 // centered
 inline ofVec2f pathPtToPlanePt(ofVec2i pathPt) {
-	return ofVec2f(pathPt.x * kCellSize.x,
-				   pathPt.y * kCellSize.y) + kCellSize / 2.0;
+	return ofVec2f(pathPt.x * kCellSize.x, pathPt.y * kCellSize.y) + kCellSize / 2.0 + kGridStart;
 }
 
 inline ofVec2i planePtToPathPt(ofVec2f planePt) {
-	return ofVec2i(floor(planePt.x / kCropBox.width * kNumGridPtsPerAxis.x),
-				   floor(planePt.y / kCropBox.height * kNumGridPtsPerAxis.y));
+	return ofVec2i(floor((planePt.x - kGridStart.x) / kCropBox.width * kNumGridPtsPerAxis.x),
+				   floor((planePt.y - kGridStart.y) / kCropBox.height * kNumGridPtsPerAxis.y));
 }
 
 //--------------------------------------------------------------
@@ -52,12 +52,15 @@ void ofApp::setup() {
 	robotsById[r01->id] = r01;
 	robotsByMarker[r01->markerId] = r01;
 	r01->setCommunication("192.168.7.74", 5111);
+	robotIds.push_back(r01->id);
+	r01->potentialField.walls = kSafetyBox;
 
 	Robot *r02 = new Robot(2, 26, "Camille");
 	robotsById[r02->id] = r02;
 	robotsByMarker[r02->markerId] = r02;
 	r02->setCommunication("192.168.7.73", 5111);
 	robotIds.push_back(r02->id);
+	r02->potentialField.walls = kSafetyBox;
 
 #if SIMULATING
 	r01->planePos = ofVec2f(-0.35);
@@ -313,6 +316,7 @@ void ofApp::update() {
 #endif
 	handleOSC();
 	receiveFromRobots();
+	planRobotPaths();
 	commandRobots();
 	updateGui();
 }
@@ -391,154 +395,156 @@ void ofApp::unclaimPath(int robotId) {
 }
 
 void ofApp::planRobotPaths() {
-	PathPlanner pathPlanner(kNumGridPtsPerAxis.x, kNumGridPtsPerAxis.y);
-
-	// First, add robot positions
-	for (int robotId : robotIds) {
-		Robot &r = *robotsById[robotId];
-
-		r.needsReplan = false;
-		ofVec2i currentCell = planePtToPathPt(r.planePos);
-		if (pathPlanner.at(currentCell).containsRobotId >= 0) {
-			cout << "Cell contains two robots!!!" << endl;
-		} else {
-			pathPlanner.at(currentCell).containsRobotId = robotId;
-		}
-	}
-
-	// Next, add robot drawing
-	for (int robotId : robotIds) {
-		Robot &r = *robotsById[robotId];
-
-		if (r.state == R_WAITING_TO_DRAW) {
-			for (ofVec2i &pt : r.drawPathMask) {
-				if (pathPlanner.at(pt).onDrawPathForRobotId >= 0 && pathPlanner.at(pt).onDrawPathForRobotId != robotId) {
-					r.needsReplan = true;
-				} else {
-					pathPlanner.at(pt).onDrawPathForRobotId = robotId;
-				}
-			}
-		} else if (r.state == R_DRAWING) {
-			for (ofVec2i &pt : r.drawPathMask) {
-				if (pathPlanner.at(pt).onDrawPathForRobotId >= 0 && pathPlanner.at(pt).onDrawPathForRobotId != robotId) {
-					r.stop();
-					cout << "Going to draw into another robot!!" << endl;
-				} else {
-					pathPlanner.at(pt).onDrawPathForRobotId = robotId;
-				}
-			}
-		}
-	}
-
-		//			static const int linear = 50;
-		//			static const int radial = 8;
-		//			ofVec2f cur = r.startPlanePos;
-		//			ofVec2f target = r.targetPlanePos;
-		//			ofVec2f diff = target - cur / (linear - 1);
-		//			for (int i = 0; i < linear + 1; ++i) {
-		//				for (int j = 0; j < radial; ++j) {
-		//					ofVec2f rad = cur + ofVec2f(0.25f).rotate(360.0 * j / radial);
-		//					ofVec2i currentCell = planePtToPathPt(rad);
-		//
-		//					if (pathPlanner.at(currentCell).onDrawPathForRobotId >= 0 ||
-		//						pathPlanner.at(currentCell).containsRobotId >= 0) {
-		//						cout << "Drawing path contains a robot or another robot's drawing path!" << endl;
-		//					}
-		//
-		//					pathPlanner.at(currentCell).onDrawPathForRobotId = robotId;
-		//				}
-		//				cur += diff;
-		//			}
-
-	// Add next paths
-	for (int robotId : robotIds) {
-		Robot &r = *robotsById[robotId];
-
-		if (r.state == R_POSITIONING) {
-			ofVec2i nextCell = r.path[r.pathIdx];
-			if (pathPlanner.at(nextCell).containsRobotId >= 0) {
-				if (pathPlanner.at(nextCell).containsRobotId > robotId) {
-					r.setState(R_WAITING_TO_POSITION);
-				} else {
-					r.needsReplan = true;
-				}
-			} else if (pathPlanner.at(nextCell).nextPathForRobotId >= 0) {
-				r.needsReplan = true;
-			} else {
-				pathPlanner.at(nextCell).nextPathForRobotId = robotId;
-			}
-		}
-	}
-
-	// Find paths
-	for (auto &p : robotsById) {
-		int id = p.first;
-		Robot &r = *p.second;
-
-		if (r.state == R_READY_TO_POSITION) {
-			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading, r.pathTypes);
-			robotPaths[id] = mp;
-
-			if (r.path.size() > 0) {
-				// We're on a path, keep going.
-				if (r.pathIdx == r.path.size() - 1) {
-					// We made it to the end of the path, go to the real target
-					r.navigateTo(mp->segment.start);
-				} else {
-					r.navigateTo(pathPtToPlanePt(r.path[r.pathIdx]));
-				}
-			} else {
-				// TODO: find a path!
-			}
-		} else if (r.state == R_DONE_POSITIONING) {
-			if (r.path.size() > 0) {
-				if (r.pathIdx == r.path.size() - 1) {
-					MapPath *mp = robotPaths[id];
-					if (mp == NULL) {
-						r.stop();
-						r.setState(R_READY_TO_POSITION);
-					} else {
-						r.drawLine(mp->segment.start, mp->segment.end);
-					}
-				} else {
-					r.setState(R_READY_TO_POSITION);
-				}
-			} else {
-				cout << "Error: finished positioning without a path somehow" << endl;
-			}
-		} else if (r.state == R_DONE_DRAWING) {
-			if (robotPaths.find(id) == robotPaths.end()) {
-				// Error!
-				r.stop();
-			} else {
-				MapPath *mp = robotPaths[id];
-				if (mp == NULL) {
-					// error!
-					r.stop();
-				} else {
-					mp->drawn = true;
-					robotPaths.erase(id);
-					if (debugging) {
-						r.planePos = mp->segment.end;
-						r.avgPlanePos = mp->segment.end;
-						r.slowAvgPlanePos = mp->segment.end;
-					}
-					// TODO: make this a function on robot specifically
-					r.setState(R_READY_TO_POSITION);
-				}
-			}
-		}
-
-		ofVec2i current = planePtToPathPt(r.planePos);
-		ofVec2i target = planePtToPathPt(r.finalTarget);
-
-		vector<ofVec2i> path = pathPlanner.findPath(current, target);
-		if (path.size() > 0) {
-			r.path = path;
-		} else {
-			// No path!
-		}
-	}
+//	PathPlanner pathPlanner(kNumGridPtsPerAxis.x, kNumGridPtsPerAxis.y);
+//
+//	// First, add robot positions
+//	for (int robotId : robotIds) {
+//		Robot &r = *robotsById[robotId];
+//
+//		r.needsReplan = false;
+//		ofVec2i currentCell = planePtToPathPt(r.planePos);
+//		if (pathPlanner.at(currentCell)->containsRobotId >= 0) {
+//			cout << "Cell contains two robots!!!" << endl;
+//		} else {
+//			pathPlanner.at(currentCell)->containsRobotId = robotId;
+//		}
+//	}
+//
+//	// Next, add robot drawing
+//	for (int robotId : robotIds) {
+//		Robot &r = *robotsById[robotId];
+//
+//		if (r.state == R_WAITING_TO_DRAW) {
+//			for (ofVec2i &pt : r.drawPathMask) {
+//				if (pathPlanner.at(pt)->onDrawPathForRobotId >= 0 && pathPlanner.at(pt)->onDrawPathForRobotId != robotId) {
+//					r.needsReplan = true;
+//				} else {
+//					pathPlanner.at(pt)->onDrawPathForRobotId = robotId;
+//				}
+//			}
+//		} else if (r.state == R_DRAWING) {
+//			for (ofVec2i &pt : r.drawPathMask) {
+//				if (pathPlanner.at(pt)->onDrawPathForRobotId >= 0 && pathPlanner.at(pt)->onDrawPathForRobotId != robotId) {
+//					r.stop();
+//					cout << "Going to draw into another robot!!" << endl;
+//				} else {
+//					pathPlanner.at(pt)->onDrawPathForRobotId = robotId;
+//				}
+//			}
+//		}
+//	}
+//
+//		//			static const int linear = 50;
+//		//			static const int radial = 8;
+//		//			ofVec2f cur = r.startPlanePos;
+//		//			ofVec2f target = r.targetPlanePos;
+//		//			ofVec2f diff = target - cur / (linear - 1);
+//		//			for (int i = 0; i < linear + 1; ++i) {
+//		//				for (int j = 0; j < radial; ++j) {
+//		//					ofVec2f rad = cur + ofVec2f(0.25f).rotate(360.0 * j / radial);
+//		//					ofVec2i currentCell = planePtToPathPt(rad);
+//		//
+//		//					if (pathPlanner.at(currentCell).onDrawPathForRobotId >= 0 ||
+//		//						pathPlanner.at(currentCell).containsRobotId >= 0) {
+//		//						cout << "Drawing path contains a robot or another robot's drawing path!" << endl;
+//		//					}
+//		//
+//		//					pathPlanner.at(currentCell).onDrawPathForRobotId = robotId;
+//		//				}
+//		//				cur += diff;
+//		//			}
+//
+//	// Add next paths
+//	for (int robotId : robotIds) {
+//		Robot &r = *robotsById[robotId];
+//
+//		if (r.state == R_POSITIONING) {
+//			ofVec2i nextCell = r.path[r.pathIdx];
+//			if (pathPlanner.at(nextCell)->containsRobotId >= 0) {
+//				if (pathPlanner.at(nextCell)->containsRobotId > robotId) {
+//					r.setState(R_WAITING_TO_POSITION);
+//				} else {
+//					r.needsReplan = true;
+//				}
+//			} else if (pathPlanner.at(nextCell)->nextPathForRobotId >= 0) {
+//				r.needsReplan = true;
+//			} else {
+//				pathPlanner.at(nextCell)->nextPathForRobotId = robotId;
+//			}
+//		}
+//	}
+//
+//	// Find paths
+////	for (auto &p : robotsById) {
+////		int id = p.first;
+////		Robot &r = *p.second;
+////
+////		if (r.state == R_READY_TO_POSITION) {
+////			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading, r.pathTypes);
+////			robotPaths[id] = mp;
+////
+////			if (r.path.size() > 0) {
+////				// We're on a path, keep going.
+////				if (r.pathIdx == r.path.size() - 1) {
+////					// We made it to the end of the path, go to the real target
+////					r.navigateTo(mp->segment.start);
+////				} else {
+////					r.navigateTo(pathPtToPlanePt(r.path[r.pathIdx]));
+////				}
+////			} else {
+////				// TODO: find a path!
+////			}
+////		} else if (r.state == R_DONE_POSITIONING) {
+////			if (r.path.size() > 0) {
+////				if (r.pathIdx == r.path.size() - 1) {
+////					MapPath *mp = robotPaths[id];
+////					if (mp == NULL) {
+////						r.stop();
+////						r.setState(R_READY_TO_POSITION);
+////					} else {
+////						r.drawLine(mp->segment.start, mp->segment.end);
+////					}
+////				} else {
+////					r.setState(R_READY_TO_POSITION);
+////				}
+////			} else {
+////				cout << "Error: finished positioning without a path somehow" << endl;
+////			}
+////		} else if (r.state == R_DONE_DRAWING) {
+////			if (robotPaths.find(id) == robotPaths.end()) {
+////				// Error!
+////				r.stop();
+////			} else {
+////				MapPath *mp = robotPaths[id];
+////				if (mp == NULL) {
+////					// error!
+////					r.stop();
+////				} else {
+////					mp->drawn = true;
+////					robotPaths.erase(id);
+////					if (debugging) {
+////						r.planePos = mp->segment.end;
+////						r.avgPlanePos = mp->segment.end;
+////						r.slowAvgPlanePos = mp->segment.end;
+////					}
+////					// TODO: make this a function on robot specifically
+////					r.setState(R_READY_TO_POSITION);
+////				}
+////			}
+////		}
+////
+////		ofVec2i current = planePtToPathPt(r.planePos);
+////		ofVec2i target = planePtToPathPt(r.finalTarget);
+////
+////		vector<ofVec2i> path = pathPlanner.findPath(current, target);
+////		if (path.size() > 0) {
+////			r.path = path;
+////		} else {
+////			// No path!
+////		}
+////	}
+//
+//	drawnPathPlanner = pathPlanner;
 }
 
 void ofApp::commandRobots() {
@@ -546,70 +552,79 @@ void ofApp::commandRobots() {
 		int id = p.first;
 		Robot &r = *p.second;
 
+		vector<PotentialFieldObstacle> o;
 		for (auto &p2 : robotsById) {
 			int id2 = p2.first;
 			if (id == id2) continue;
 
-			Robot &r2 = *p2.second;
-
-			float dist = r.planePos.distance(r2.planePos);
-			if (dist < kRobotSafetyDiameterM) {
-				// Too close! Stop entirely.
-				r.stop();
-				r2.stop();
-				cout << "Stopping both robots, way too close " << dist << endl;
-			} else if (dist < kRobotOuterSafetyDiameterM) {
-				// Noone is drawing
-				ofVec2f oneToTwo = r2.planePos - r.planePos;
-				ofVec2f midpoint = oneToTwo / 2.0 + r.planePos;
-				oneToTwo.normalize();
-
-				bool success = false;
-
-				ofVec2f r2left = r2.planePos + oneToTwo.rotate(-90) * 0.25f;
-				ofVec2f r2right = r2.planePos + oneToTwo.rotate(90) * 0.25f;
-				if (!success && r2.state != R_DRAWING) {
-					if (kSafetyBox.inside(r2left)) {
-						unclaimPath(id);
-						unclaimPath(id2);
-						r2.navigateTo(r2left);
-						r.stop();
-						success = true;
-					} else if (kSafetyBox.inside(r2right)) {
-						unclaimPath(id);
-						unclaimPath(id2);
-						r2.navigateTo(r2right);
-						r.stop();
-						success = true;
-					}
-				}
-
-				if (!success && r.state != R_DRAWING) {
-					ofVec2f r1left = r.planePos + oneToTwo.rotate(90) * 0.25f;
-					ofVec2f r1right = r.planePos + oneToTwo.rotate(-90) * 0.25f;
-					if (kSafetyBox.inside(r1left)) {
-						unclaimPath(id);
-						unclaimPath(id2);
-						r.navigateTo(r1left);
-						r2.stop();
-						success = true;
-					} else if (kSafetyBox.inside(r1right)) {
-						unclaimPath(id);
-						unclaimPath(id2);
-						r.navigateTo(r1right);
-						r2.stop();
-						success = true;
-					}
-				}
-
-				// Couldn't force robots to renavigate around each other
-				if (!success) {
-					r.stop();
-					r2.stop();
-					cout << "Stopping both robots " << dist << endl;
-				}
-			}
+			o.push_back({ p2.second->planePos, 0.1f });
 		}
+		r.updateObstacles(o);
+
+//		for (auto &p2 : robotsById) {
+//			int id2 = p2.first;
+//			if (id == id2) continue;
+//
+//			Robot &r2 = *p2.second;
+//
+//			float dist = r.planePos.distance(r2.planePos);
+//			if (dist < kRobotSafetyDiameterM) {
+//				// Too close! Stop entirely.
+//				r.stop();
+//				r2.stop();
+//				cout << "Stopping both robots, way too close " << dist << endl;
+//			} else if (dist < kRobotOuterSafetyDiameterM) {
+//				// Noone is drawing
+//				ofVec2f oneToTwo = r2.planePos - r.planePos;
+//				ofVec2f midpoint = oneToTwo / 2.0 + r.planePos;
+//				oneToTwo.normalize();
+//
+//				bool success = false;
+//
+//				ofVec2f r2left = r2.planePos + oneToTwo.rotate(-90) * 0.25f;
+//				ofVec2f r2right = r2.planePos + oneToTwo.rotate(90) * 0.25f;
+//				if (!success && r2.state != R_DRAWING) {
+//					if (kSafetyBox.inside(r2left)) {
+//						unclaimPath(id);
+//						unclaimPath(id2);
+//						r2.navigateTo(r2left);
+//						r.stop();
+//						success = true;
+//					} else if (kSafetyBox.inside(r2right)) {
+//						unclaimPath(id);
+//						unclaimPath(id2);
+//						r2.navigateTo(r2right);
+//						r.stop();
+//						success = true;
+//					}
+//				}
+//
+//				if (!success && r.state != R_DRAWING) {
+//					ofVec2f r1left = r.planePos + oneToTwo.rotate(90) * 0.25f;
+//					ofVec2f r1right = r.planePos + oneToTwo.rotate(-90) * 0.25f;
+//					if (kSafetyBox.inside(r1left)) {
+//						unclaimPath(id);
+//						unclaimPath(id2);
+//						r.navigateTo(r1left);
+//						r2.stop();
+//						success = true;
+//					} else if (kSafetyBox.inside(r1right)) {
+//						unclaimPath(id);
+//						unclaimPath(id2);
+//						r.navigateTo(r1right);
+//						r2.stop();
+//						success = true;
+//					}
+//				}
+//
+//				// Couldn't force robots to renavigate around each other
+//				if (!success) {
+//					r.stop();
+//					r2.stop();
+//					cout << "Stopping both robots " << dist << endl;
+//				}
+//			}
+//		}
 
 		// Determine draw state
 		if (state == MR_STOPPED) {
@@ -630,7 +645,7 @@ void ofApp::commandRobots() {
 				}
 
 				mp->claimed = true;
-				r.navigateTo(mp->segment.start);
+				r.navigateWithGradientTo(mp->segment.start);
                 r.lastHeading = atan2(mp->segment.end.x - mp->segment.start.x, mp->segment.end.y - mp->segment.start.y)*180/3.14159;
 			} else {
 				cout << "No more paths to draw!" << endl;
@@ -809,6 +824,40 @@ void ofApp::draw(){
 		ofPopMatrix();
 	}
 	ofPopStyle();
+//
+//	ofPushStyle();
+//	ofNoFill();
+//	for (int x = 0; x < drawnPathPlanner.width; ++x) {
+//		for (int y = 0; y < drawnPathPlanner.height; ++y) {
+//			GridNode &g = *drawnPathPlanner.at(ofVec2i(x,y));
+//			ofVec2f planePt = pathPtToPlanePt(g.loc);
+//
+//			if (g.containsRobotId >= 0) {
+//				ofSetColor(255, 255, 255);
+//			} else if (g.onDrawPathForRobotId >= 0) {
+//				ofSetColor(255, 0, 0);
+//			} else if (g.nextPathForRobotId >= 0) {
+//				ofSetColor(255, 255, 0);
+//			} else {
+//				ofSetColor(40, 40, 40);
+//			}
+//			ofDrawRectangle(planePt - kCellSize * 0.8 / 2.0, kCellSize.x * 0.8, kCellSize.y * 0.8);
+//		}
+//	}
+//	ofPopStyle();
+
+	ofPushStyle();
+	ofNoFill();
+	ofSetColor(255);
+	PotentialField pf = robotsById[1]->potentialField;//{ kSafetyBox, { { robotsById[2]->planePos, 0.1 } }, ofVec2f(0) };
+	float gridSize = kSafetyBox.getWidth() / 100.0;
+	for (float x = kSafetyBox.getLeft() - 0.5; x < kSafetyBox.getRight() + 0.5; x += gridSize) {
+		for (float y = kSafetyBox.getTop() - 0.5; y < kSafetyBox.getBottom() + 0.5; y += gridSize) {
+			float h = pf.fieldAtPoint(ofVec2f(x,y));
+			ofDrawRectangle(x, y, h / 10000.0, gridSize, gridSize);
+		}
+	}
+	ofPopStyle();
 
 	for (map<int, Robot*>::iterator it = robotsById.begin(); it != robotsById.end(); ++it) {
 		int robotId = it->first;
@@ -827,6 +876,8 @@ void ofApp::draw(){
 
 //			ofDrawRectangle(planePt - ofVec2f(gridSize * 0.4), gridSize * 0.8, gridSize * 0.8);
 		}
+
+		ofDrawSphere(r.potentialField.goal, 0.02);
 
         // draw current path for the robot:
 		if (r.state == R_DRAWING || debugging) {

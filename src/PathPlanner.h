@@ -6,8 +6,7 @@
 //
 //
 
-#ifndef PathPlanner_h
-#define PathPlanner_h
+#pragma once
 
 #include "ofMain.h"
 #include "VecExt.h"
@@ -36,16 +35,17 @@ public:
 		height = _height;
 		grid.reserve(width);
 		for (int x = 0; x < width; ++x) {
+			grid.push_back(vector<GridNode>());
 			grid[x].reserve(height);
 			for (int y = 0; y < height; ++y) {
+				grid[x].push_back(GridNode());
 				grid[x][y].loc = ofVec2i(x, y);
 			}
 		}
 	}
 
-	GridNode& at(ofVec2i pt);
+	GridNode* at(ofVec2i pt);
 	float distance(ofVec2i pt1, ofVec2i pt2);
 	vector<ofVec2i> findPath(ofVec2i origin, ofVec2i target);
 };
 
-#endif

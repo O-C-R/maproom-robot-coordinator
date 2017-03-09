@@ -41,4 +41,16 @@ public:
 	int x,y;
 };
 
+class ThreePtRect {
+public:
+	ThreePtRect(const ofVec2f& ul, const ofVec2f& bl, const ofVec2f& br): ul(ul), bl(bl), br(br) {};
+
+	bool contains(const ofVec2f pt) {
+
+	}
+
+	ofVec2f ul, bl, br;
+
+};
+
 #endif /* VecExt_h */

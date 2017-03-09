@@ -12,8 +12,8 @@ float PathPlanner::distance(ofVec2i pt1, ofVec2i pt2) {
 	return ofVec2f(pt1.x, pt1.y).distance(ofVec2f(pt2.x, pt2.y));
 }
 
-GridNode& PathPlanner::at(ofVec2i pt) {
-	return grid[pt.x][pt.y];
+GridNode* PathPlanner::at(ofVec2i pt) {
+	return &grid[pt.x][pt.y];
 }
 
 vector<ofVec2i> PathPlanner::findPath(ofVec2i origin, ofVec2i target) {

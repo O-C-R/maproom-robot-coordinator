@@ -29,6 +29,7 @@ typedef enum RobotState {
 	R_READY_TO_POSITION,
 	R_WAITING_TO_POSITION,
 	R_POSITIONING,
+	R_POSITIONING_WITH_FIELD,
     R_WAIT_AFTER_POSITION,
     R_DONE_POSITIONING,
 	R_WAITING_TO_DRAW,
@@ -40,13 +41,57 @@ typedef enum RobotState {
 typedef enum RobotPathState {
 	RP_NONE,
 	RP_WAITING
-};
+} RobotPathState;
 
 typedef enum PenState {
 	P_UNKNOWN,
 	P_UP,
 	P_DOWN
 } PenState;
+
+struct PotentialFieldObstacle {
+	ofVec2f pos;
+	float radius;
+};
+
+// Holy magic numbers batman
+struct PotentialField {
+	ofRectangle walls;
+	vector<PotentialFieldObstacle> obstacles;
+	ofVec2f goal;
+
+	float fieldAtPoint(const ofVec2f &point) {
+		float score = 0;
+
+		for (auto &obstacle : obstacles) {
+			float distanceToObstacle = point.distance(obstacle.pos);
+
+			if (distanceToObstacle < obstacle.radius) {
+				score += 1000;
+			}
+
+			score += 10.0 / pow(distanceToObstacle, 3.0);
+		}
+
+		if (!walls.inside(point)) {
+			score += 1000.0 * pow(walls.getCenter().distance(point), 2.0) + 10000.0;
+		} else {
+			float distT = abs(walls.getTop() - point.y);
+			float distB = abs(walls.getBottom() - point.y);
+			float distL = abs(walls.getLeft() - point.x);
+			float distR = abs(walls.getRight() - point.x);
+			float minDist = min(distT, min(distB, min(distL, distR))) + 0.0000001;
+
+			score += 0.1 * 1.0 / pow(minDist, 3.0);
+		}
+
+
+		float distanceToGoal = point.distance(goal) + 0.0000001;
+		score -= 100.0 / pow(distanceToGoal, 2.0);
+
+		return score;
+	}
+};
 
 class Robot {
 
@@ -72,6 +117,7 @@ public:
 
 	// States
 	void moveRobot(char *msg, bool drawing, bool &shouldSend);
+	void moveWithGradient(char *msg, bool &shouldSend);
     bool inPosition(const ofVec2f &pos);
 	bool atRotation();
 
@@ -89,7 +135,9 @@ public:
     
     // nav states
 	void navigateTo(const ofVec2f &target);
-    void drawLine(const ofVec2f &start, const ofVec2f &end);
+	void navigateWithGradientTo(const ofVec2f &target);
+	void updateObstacles(const vector<PotentialFieldObstacle> &obstacles);
+	void drawLine(const ofVec2f &start, const ofVec2f &end);
     
     // test commands
     void testRotate(float angle);
@@ -115,6 +163,7 @@ public:
 	// Targets
 	float targetRot;
 	ofVec2f startPlanePos, targetPlanePos;
+	ofVec2f fieldDirection;
 
 	// Path planning
 	MapPath *claimedMp;
@@ -155,6 +204,8 @@ public:
     // used for map next path
 	set<string> pathTypes;
     float lastHeading;
+
+	PotentialField potentialField;
 };
 
 #endif

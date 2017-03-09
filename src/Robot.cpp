@@ -170,6 +170,8 @@ string Robot::stateString() {
 			return "R_READY_TO_POSITION";
 		case R_POSITIONING:
 			return "R_POSITIONING";
+		case R_POSITIONING_WITH_FIELD:
+			return "R_POSITIONING_WITH_FIELD";
 		case R_WAIT_AFTER_POSITION:
 			return "R_WAIT_AFTER_POSITION";
 		case R_DONE_POSITIONING:
@@ -223,10 +225,12 @@ void Robot::updateCamera(const ofVec2f &imPos, const ofVec2f &imUp) {
 }
 
 void Robot::updateSimulation(float dt) {
-	const float unitsPerSec = 0.2;
+	const float unitsPerSec = 0.05;
 	if (state == R_POSITIONING || state == R_DRAWING) {
 		// TODO: add noise?
 		planePos += (targetPlanePos - startPlanePos).normalize() * dt * unitsPerSec;
+	} else if (state == R_POSITIONING_WITH_FIELD) {
+		planePos += fieldDirection * dt * unitsPerSec;
 	}
 
 	updateCamera(planePos, upVec);
@@ -262,6 +266,21 @@ void Robot::setState(RobotState newState) {
 	targetLinePID.reset();
 
 	stateStartTime = ofGetElapsedTimef();
+}
+
+void Robot::moveWithGradient(char *msg, bool &shouldSend) {
+	float xL = potentialField.fieldAtPoint(planePos + ofVec2f(-0.001f, 0));
+	float xR = potentialField.fieldAtPoint(planePos + ofVec2f( 0.001f, 0));
+	float yU = potentialField.fieldAtPoint(planePos + ofVec2f(0, -0.001f));
+	float yD = potentialField.fieldAtPoint(planePos + ofVec2f(0,  0.001f));
+
+	float xSlope = xR - xL;
+	float ySlope = yD - yU;
+
+	fieldDirection = ofVec2f(-xSlope, -ySlope).normalize();
+	vecToEnd = fieldDirection * 20.0f;
+
+	// TODO: send message
 }
 
 void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
@@ -318,6 +337,18 @@ void Robot::navigateTo(const ofVec2f &target) {
 	targetPlanePos = target;
 
     setState(R_POSITIONING);
+}
+
+void Robot::navigateWithGradientTo(const ofVec2f &target) {
+	potentialField.goal = target;
+	startPlanePos = avgPlanePos;
+	targetPlanePos = target;
+
+	setState(R_POSITIONING_WITH_FIELD);
+}
+
+void Robot::updateObstacles(const vector<PotentialFieldObstacle> &obstacles) {
+	potentialField.obstacles = obstacles;
 }
 
 void Robot::drawLine(const ofVec2f &start, const ofVec2f &end) {
@@ -418,13 +449,23 @@ void Robot::update() {
             // move is different from draw
             moveRobot(msg, false, shouldSend);
         }
+	} else if (state == R_POSITIONING_WITH_FIELD) {
+		// move in direction at magnitude
+		if (inPosition(planePos)) {
+			cmdStop(msg, false);
+			mustSend = true;
+			setState(R_WAIT_AFTER_POSITION);
+		} else {
+			// move is different from draw
+			moveWithGradient(msg, shouldSend);
+		}
     } else if (state == R_WAIT_AFTER_POSITION) {
         cmdStop(msg);
         shouldSend = true;
 
         if (elapsedStateTime > 0.15f && !inPosition(avgPlanePos)) {
 			// Go back, we're out of position.
-            setState(R_POSITIONING);
+            setState(R_POSITIONING_WITH_FIELD);
         } else if (elapsedStateTime > 0.3f) {
 			// We've waited long enough, start drawing.
             setState(R_DONE_POSITIONING);

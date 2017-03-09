@@ -116,6 +116,7 @@ private:
 
 	string mapPath;
     Map *currentMap;
+	PathPlanner drawnPathPlanner;
 
 	MaproomState state;
 	float stateStartTime;

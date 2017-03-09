@@ -19,6 +19,7 @@ typedef struct pathSegment {
 	ofVec2f prescaleStart, prescaleEnd;
 } pathSegment;
 
+
 typedef struct MapPath {
 	int id;
     bool claimed, drawn;
