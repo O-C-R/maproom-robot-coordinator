@@ -26,9 +26,6 @@ typedef struct RobotGui {
 	ofxDatGuiLabel *lastMessageLabel;
 	ofxDatGuiToggle *enableToggle;
 
-	ofxDatGuiSlider *kp, *ki, *kd, *kMaxI;
-	ofxDatGuiSlider *minSpeed, *maxSpeed, *speedRamp;
-
 	ofxDatGuiButton *calibrateButton, *advanceButton;
 	ofxDatGuiSlider *rotationAngleSlider;
 } RobotGui;
@@ -104,6 +101,9 @@ private:
 	ofxDatGuiLabel *stateLabel, *pathLabel, *drawnPathLabel, *pathStatusLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
 	ofxDatGuiDropdown *rpiStateDropdown;
+	ofxDatGuiFolder *robotConstantsFolder;
+	ofxDatGuiSlider *kpSlider, *kiSlider, *kdSlider, *kMaxISlider;
+	ofxDatGuiSlider *minSpeedSlider, *maxSpeedSlider, *speedRampSlider;
 	map<int, RobotGui> robotGuis;
 	map<string, PathGui> pathGuis;
 

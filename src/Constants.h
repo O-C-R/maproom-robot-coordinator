@@ -9,6 +9,6 @@
 #ifndef Constants_h
 #define Constants_h
 
-#define SIMULATING 1
+#define SIMULATING 0
 
 #endif /* Constants_h */

@@ -1,7 +1,7 @@
 #include "ofApp.h"
 
 static const string kDefaultMapPath = "test.svg";
-static const string kDownloadPath = "/Users/anderson/Downloads/";
+static const string kDownloadPath = "/Users/maproom/Downloads/";
 
 static const string kRPiHost = "192.168.7.52";
 static const int kRPiPort = 5300;
@@ -26,6 +26,8 @@ static char buf[1024];
 //--------------------------------------------------------------
 
 void ofApp::setup() {
+	ofSetDataPathRoot("../Resources/data");
+
 	ofSetVerticalSync(true);
 	ofSetBackgroundColor(0);
 
@@ -100,53 +102,67 @@ void ofApp::setup() {
         rGui.stateLabel = rGui.folder->addLabel(r.stateDescription());
 		rGui.posLabel = rGui.folder->addLabel(r.positionString());
 		rGui.lastMessageLabel = rGui.folder->addLabel("");
-		rGui.folder->addBreak();
-		rGui.kp = rGui.folder->addSlider("kp", 0, 30000);
-		rGui.kp->setValue(r.targetLineKp);
-		rGui.ki = rGui.folder->addSlider("ki", 0, 2000);
-		rGui.ki->setValue(r.targetLineKi);
-		rGui.kd = rGui.folder->addSlider("kd", 0, 50);
-		rGui.kd->setValue(r.targetLineKd);
-		rGui.kMaxI = rGui.folder->addSlider("kMaxI", 0, 20000);
-		rGui.kMaxI->setValue(r.targetLineMaxI);
-		rGui.folder->addBreak();
-		rGui.minSpeed = rGui.folder->addSlider("minSpeed", 0, 1024);
-		rGui.minSpeed->setValue(r.minSpeed);
-		rGui.minSpeed->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.minSpeed = e.value;
-		});
-		rGui.maxSpeed = rGui.folder->addSlider("maxSpeed", 0, 1024);
-		rGui.maxSpeed->setValue(r.maxSpeed);
-		rGui.maxSpeed->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.maxSpeed = e.value;
-		});
-		rGui.speedRamp = rGui.folder->addSlider("speedRamp", 0, 1);
-		rGui.speedRamp->setValue(r.speedRamp);
-		rGui.speedRamp->onSliderEvent([&r](ofxDatGuiSliderEvent e) {
-			r.speedRamp = e.value;
-		});
         rGui.advanceButton = rGui.folder->addButton("Skip path");
-
-		auto pidListener = [&rGui, &r](ofxDatGuiSliderEvent e) {
-			r.updatePID(rGui.kp->getValue(),
-						rGui.ki->getValue(),
-						rGui.kd->getValue(),
-						rGui.kMaxI->getValue());
-		};
-
-        // event listeners
-		rGui.kp->onSliderEvent(pidListener);
-		rGui.ki->onSliderEvent(pidListener);
-		rGui.kd->onSliderEvent(pidListener);
-		rGui.kMaxI->onSliderEvent(pidListener);
-
         rGui.advanceButton->onButtonEvent([&r](ofxDatGuiButtonEvent e) {
             r.setState(R_DONE_DRAWING);
         });
 
 		gui->addBreak();
     }
-    
+
+	robotConstantsFolder = gui->addFolder("Robot Constants");
+	kpSlider = robotConstantsFolder->addSlider("kp", 0, 30000);
+	kpSlider->setValue(r01->targetLineKp);
+	kiSlider = robotConstantsFolder->addSlider("ki", 0, 2000);
+	kiSlider->setValue(r01->targetLineKi);
+	kdSlider = robotConstantsFolder->addSlider("kd", 0, 50);
+	kdSlider->setValue(r01->targetLineKd);
+	kMaxISlider = robotConstantsFolder->addSlider("kMaxI", 0, 20000);
+	kMaxISlider->setValue(r01->targetLineMaxI);
+	robotConstantsFolder->addBreak();
+	minSpeedSlider = robotConstantsFolder->addSlider("minSpeed", 0, 1024);
+	minSpeedSlider->setValue(r01->minSpeed);
+	minSpeedSlider->onSliderEvent([this](ofxDatGuiSliderEvent e) {
+		for (auto &p : robotsById) {
+			Robot &r = *p.second;
+			r.minSpeed = e.value;
+		}
+	});
+	maxSpeedSlider = robotConstantsFolder->addSlider("maxSpeed", 0, 1024);
+	maxSpeedSlider->setValue(r01->maxSpeed);
+	maxSpeedSlider->onSliderEvent([this](ofxDatGuiSliderEvent e) {
+		for (auto &p : robotsById) {
+			Robot &r = *p.second;
+			r.maxSpeed = e.value;
+		}
+	});
+	speedRampSlider = robotConstantsFolder->addSlider("speedRamp", 0, 1);
+	speedRampSlider->setValue(r01->speedRamp);
+	speedRampSlider->onSliderEvent([this](ofxDatGuiSliderEvent e) {
+		for (auto &p : robotsById) {
+			Robot &r = *p.second;
+			r.speedRamp = e.value;
+		}
+	});
+
+	auto pidListener = [this](ofxDatGuiSliderEvent e) {
+		for (auto &p : robotsById) {
+			Robot &r = *p.second;
+
+			r.updatePID(kpSlider->getValue(),
+						kiSlider->getValue(),
+						kdSlider->getValue(),
+						kMaxISlider->getValue());
+		}
+	};
+
+	// event listeners
+	kpSlider->onSliderEvent(pidListener);
+	kiSlider->onSliderEvent(pidListener);
+	kdSlider->onSliderEvent(pidListener);
+	kMaxISlider->onSliderEvent(pidListener);
+
+	gui->addBreak();
 
     ofxDatGuiButton *reloadMapButton = gui->addButton("Reset Map");
 	reloadMapButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
@@ -393,55 +409,55 @@ void ofApp::commandRobots() {
 				r2.stop();
 				cout << "Stopping both robots, way too close " << dist << endl;
 			} else if (dist < kRobotOuterSafetyDiameterM) {
-				// Noone is drawing
-				ofVec2f oneToTwo = r2.planePos - r.planePos;
-				ofVec2f midpoint = oneToTwo / 2.0 + r.planePos;
-				oneToTwo.normalize();
-
-				bool success = false;
-
-				ofVec2f r2left = r2.planePos + oneToTwo.rotate(-90) * 0.25f;
-				ofVec2f r2right = r2.planePos + oneToTwo.rotate(90) * 0.25f;
-				if (!success && r2.state != R_DRAWING) {
-					if (kSafetyBox.inside(r2left)) {
-						unclaimPath(id);
-						unclaimPath(id2);
-						r2.navigateTo(r2left);
-						r.stop();
-						success = true;
-					} else if (kSafetyBox.inside(r2right)) {
-						unclaimPath(id);
-						unclaimPath(id2);
-						r2.navigateTo(r2right);
-						r.stop();
-						success = true;
-					}
-				}
-
-				if (!success && r.state != R_DRAWING) {
-					ofVec2f r1left = r.planePos + oneToTwo.rotate(90) * 0.25f;
-					ofVec2f r1right = r.planePos + oneToTwo.rotate(-90) * 0.25f;
-					if (kSafetyBox.inside(r1left)) {
-						unclaimPath(id);
-						unclaimPath(id2);
-						r.navigateTo(r1left);
-						r2.stop();
-						success = true;
-					} else if (kSafetyBox.inside(r1right)) {
-						unclaimPath(id);
-						unclaimPath(id2);
-						r.navigateTo(r1right);
-						r2.stop();
-						success = true;
-					}
-				}
-
-				// Couldn't force robots to renavigate around each other
-				if (!success) {
-					r.stop();
-					r2.stop();
-					cout << "Stopping both robots " << dist << endl;
-				}
+//				// Noone is drawing
+//				ofVec2f oneToTwo = r2.planePos - r.planePos;
+//				ofVec2f midpoint = oneToTwo / 2.0 + r.planePos;
+//				oneToTwo.normalize();
+//
+//				bool success = false;
+//
+//				ofVec2f r2left = r2.planePos + oneToTwo.rotate(-90) * 0.25f;
+//				ofVec2f r2right = r2.planePos + oneToTwo.rotate(90) * 0.25f;
+//				if (!success && r2.state != R_DRAWING) {
+//					if (kSafetyBox.inside(r2left)) {
+//						unclaimPath(id);
+//						unclaimPath(id2);
+//						r2.navigateTo(r2left);
+//						r.stop();
+//						success = true;
+//					} else if (kSafetyBox.inside(r2right)) {
+//						unclaimPath(id);
+//						unclaimPath(id2);
+//						r2.navigateTo(r2right);
+//						r.stop();
+//						success = true;
+//					}
+//				}
+//
+//				if (!success && r.state != R_DRAWING) {
+//					ofVec2f r1left = r.planePos + oneToTwo.rotate(90) * 0.25f;
+//					ofVec2f r1right = r.planePos + oneToTwo.rotate(-90) * 0.25f;
+//					if (kSafetyBox.inside(r1left)) {
+//						unclaimPath(id);
+//						unclaimPath(id2);
+//						r.navigateTo(r1left);
+//						r2.stop();
+//						success = true;
+//					} else if (kSafetyBox.inside(r1right)) {
+//						unclaimPath(id);
+//						unclaimPath(id2);
+//						r.navigateTo(r1right);
+//						r2.stop();
+//						success = true;
+//					}
+//				}
+//
+//				// Couldn't force robots to renavigate around each other
+//				if (!success) {
+//					r.stop();
+//					r2.stop();
+//					cout << "Stopping both robots " << dist << endl;
+//				}
 			}
 		}
 
