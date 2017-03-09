@@ -14,6 +14,7 @@
 #include "MiniPID.h"
 #include "VecExt.h"
 #include "Map.h"
+#include "Constants.h"
 
 static const float kMetersPerInch = 0.0254;
 static const float kMarkerSizeIn = 5.0;
@@ -61,6 +62,9 @@ public:
 	// Update from CV
 	void updateCamera(const ofVec2f &imPos, const ofVec2f &imUp);
 
+	// Update simulation
+	void updateSimulation(float dt);
+
 	// Update during loop
 	void update();
 	void setState(RobotState newState);
@@ -90,6 +94,10 @@ public:
     // test commands
     void testRotate(float angle);
     void testMove(float direction, float magnitude);
+
+	// Paths
+	void addPathType(const string &pathType);
+	void removePathType(const string &pathType);
 
 // --------------------------------------
 // -------------- DATA ------------------
@@ -145,6 +153,7 @@ public:
 	ofVec2f dirToLine, backToLine, vecToEnd, movement;
     
     // used for map next path
+	set<string> pathTypes;
     float lastHeading;
 };
 

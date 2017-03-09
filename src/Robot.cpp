@@ -71,9 +71,9 @@ Robot::Robot(int rId, int mId, const string &n) :
 	avgPlanePos(0, 0),
 	slowAvgPlanePos(0, 0),
 	allAvgPlanePos(0, 0),
-	minSpeed(128),
+	minSpeed(100),
 	maxSpeed(512),
-	speedRamp(0.25),
+	speedRamp(0.1),
 	planeVel(0, 0),
 	avgPlaneVel(0, 0),
 	targetRot(0),
@@ -86,10 +86,10 @@ Robot::Robot(int rId, int mId, const string &n) :
 	lastCameraUpdateTime(-1000),
 	cvFramerate(0),
 	lastHeartbeatTime(-1000),
-	targetLineKp(3200.0),
-	targetLineKi(7),
-	targetLineKd(700),
-	targetLineMaxI(500.0),
+	targetLineKp(20000.0),
+	targetLineKi(500),
+	targetLineKd(0),
+	targetLineMaxI(5000.0),
 	targetLinePID(targetLineKp, targetLineKi, targetLineKd)
 {
 	targetLinePID.setMaxIOutput(targetLineMaxI);
@@ -222,12 +222,26 @@ void Robot::updateCamera(const ofVec2f &imPos, const ofVec2f &imUp) {
 	lastCameraUpdateTime = now;
 }
 
+void Robot::updateSimulation(float dt) {
+	const float unitsPerSec = 0.2;
+	if (state == R_POSITIONING || state == R_DRAWING) {
+		// TODO: add noise?
+		planePos += (targetPlanePos - startPlanePos).normalize() * dt * unitsPerSec;
+	}
+
+	updateCamera(planePos, upVec);
+}
+
 void Robot::gotHeartbeat() {
 	lastHeartbeatTime = ofGetElapsedTimef();
 }
 
 bool Robot::commsUp() {
-	return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
+	if (SIMULATING) {
+		return true;
+	} else {
+		return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
+	}
 }
 
 bool Robot::cvDetected() {
@@ -236,9 +250,16 @@ bool Robot::cvDetected() {
 }
 
 void Robot::setState(RobotState newState) {
-	cout << "State change " << stateString() << " -> ";
+	if (newState == state) {
+		return;
+	}
+
+	cout << "Robot " << id << ": " << stateString() << " -> ";
 	state = newState;
 	cout << stateString() << endl;
+
+	// Reset PID on all state changes
+	targetLinePID.reset();
 
 	stateStartTime = ofGetElapsedTimef();
 }
@@ -259,7 +280,9 @@ void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 	const float distToLine = dirToLine.length();
 	const double targetLinePIDOutput = targetLinePID.getOutput(distToLine, 0.0);
 	backToLine = targetLinePIDOutput * ofVec2f(dirToLine).normalize() * -1.0;
-	backToLine *= ofMap(distanceToEnd, 0, 1, 0.5, 2.0, true);
+
+	// Apply a weighting where the line following is stronger at the start
+	backToLine *= ofMap(distanceToEnd, 0, 0.2, 0.5, 2.0, true);
 
 	// Combine the two vectors
 	movement = (vecToEnd + backToLine).normalize() * forwardMag;
@@ -293,7 +316,6 @@ bool Robot::inPosition(const ofVec2f &pos) {
 void Robot::navigateTo(const ofVec2f &target) {
 	startPlanePos = avgPlanePos;
 	targetPlanePos = target;
-	targetLinePID.reset();
 
     setState(R_POSITIONING);
 }
@@ -301,7 +323,6 @@ void Robot::navigateTo(const ofVec2f &target) {
 void Robot::drawLine(const ofVec2f &start, const ofVec2f &end) {
 	startPlanePos = start;
 	targetPlanePos = end;
-	targetLinePID.reset();
 
 	setState(R_DRAWING);
 }
@@ -401,10 +422,10 @@ void Robot::update() {
         cmdStop(msg);
         shouldSend = true;
 
-        if (elapsedStateTime > 0.5f && !inPosition(avgPlanePos)) {
+        if (elapsedStateTime > 0.15f && !inPosition(avgPlanePos)) {
 			// Go back, we're out of position.
             setState(R_POSITIONING);
-        } else if (elapsedStateTime > 1.5f) {
+        } else if (elapsedStateTime > 0.3f) {
 			// We've waited long enough, start drawing.
             setState(R_DONE_POSITIONING);
         }
@@ -434,4 +455,12 @@ void Robot::update() {
 	if (mustSend || (shouldSend && ofGetFrameNum() % 4 == 0)) {
 		sendMessage(msg);
 	}
+}
+
+void Robot::addPathType(const string &pathType) {
+	pathTypes.insert(pathType);
+}
+
+void Robot::removePathType(const string &pathType) {
+	pathTypes.erase(find(pathTypes.begin(), pathTypes.end(), pathType));
 }

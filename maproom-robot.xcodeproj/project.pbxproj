@@ -27,7 +27,6 @@
 		67FE4C7B15C2F0478C8126C2 /* NetworkingUtils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3B361208CD4107E479F04E7B /* NetworkingUtils.cpp */; };
 		6A565A9714A6A12EB9098F52 /* src_colors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27DFA5E4C611C297AADB2002 /* src_colors.cpp */; };
 		6F671E03F328673BE18F53DE /* Map.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 02A898398518BEEBFBB5AB11 /* Map.cpp */; };
-		711DC50D1E6FA52B0036B9CA /* PathPlanner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 711DC50B1E6FA52B0036B9CA /* PathPlanner.cpp */; };
 		712C50F91E693067008885F1 /* MiniPID.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 712C50F61E693067008885F1 /* MiniPID.cpp */; };
 		712C50FA1E693067008885F1 /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 712C50F81E693067008885F1 /* README.md */; };
 		7179F8821E665CBD00C68E2C /* ArucoMarker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7179F8801E665CBD00C68E2C /* ArucoMarker.cpp */; };
@@ -151,6 +150,7 @@
 		712C50F71E693067008885F1 /* MiniPID.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MiniPID.h; sourceTree = "<group>"; };
 		712C50F81E693067008885F1 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		712C50FB1E69E9AB008885F1 /* Util.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Util.h; sourceTree = "<group>"; };
+		716B8F4C1E70DEEF0056A27F /* Constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Constants.h; sourceTree = "<group>"; };
 		7179F8801E665CBD00C68E2C /* ArucoMarker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ArucoMarker.cpp; sourceTree = "<group>"; };
 		7179F8811E665CBD00C68E2C /* ArucoMarker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArucoMarker.h; sourceTree = "<group>"; };
 		744031A3E8F8DAF9FE6F3EA8 /* ofxDatGuiGroups.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiGroups.h; path = ../../../addons/ofxDatGui/src/components/ofxDatGuiGroups.h; sourceTree = SOURCE_ROOT; };
@@ -686,6 +686,7 @@
 				711DC50B1E6FA52B0036B9CA /* PathPlanner.cpp */,
 				711DC50C1E6FA52B0036B9CA /* PathPlanner.h */,
 				711DC50E1E6FBD110036B9CA /* VecExt.h */,
+				716B8F4C1E70DEEF0056A27F /* Constants.h */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;

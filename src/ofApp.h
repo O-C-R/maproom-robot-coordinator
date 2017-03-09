@@ -6,8 +6,8 @@
 #include "ofxUDPManager.h"
 #include "ofxJSON.h"
 
+#include "Constants.h"
 #include "VecExt.h"
-
 #include "Robot.h"
 #include "Map.h"
 #include "ArucoMarker.h"
@@ -36,10 +36,12 @@ typedef struct RobotGui {
 } RobotGui;
 
 typedef struct PathGui {
-    ofxDatGuiToggle *togglePath;
-    ofxDatGuiFolder *folder;
-    vector<ofxDatGuiButton *> robotSelect;
-    ofxDatGuiDropdown *drawOptions;
+	string pathType;
+	ofxDatGuiFolder *folder;
+    ofxDatGuiToggle *toggle;
+
+    vector<ofxDatGuiToggle *> robotSelect;
+//    ofxDatGuiDropdown *drawOptions;
 } PathGui;
 
 class ofApp : public ofBaseApp{
@@ -65,13 +67,13 @@ class ofApp : public ofBaseApp{
 	void setState(MaproomState newState);
 	string stateString();
 	void updateGui();
-    void receiveGuiUpdates();
     
 	void handleOSC();
 	void receiveFromRobots();
 	void commandRobots();
-    
-    void loadMap(const string &name);
+
+	void loadMap(const string &newMapPath);
+	void setupMapGui();
     
 	void unclaimPath(int robotId);
     
@@ -108,10 +110,11 @@ private:
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
 	ofxDatGuiDropdown *rpiStateDropdown;
 	map<int, RobotGui> robotGuis;
-	map<int, PathGui> pathGuis;
+	map<string, PathGui> pathGuis;
 
 	map<int, ArucoMarker> markersById;
 
+	string mapPath;
     Map *currentMap;
 
 	MaproomState state;

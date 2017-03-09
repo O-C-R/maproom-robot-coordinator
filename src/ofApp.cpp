@@ -1,9 +1,9 @@
 #include "ofApp.h"
 
-static const string currentFile = "test.svg";
-static const string filePath = "/Users/anderson/Downloads/";
+static const string kDefaultMapPath = "test.svg";
+static const string kDownloadPath = "/Users/anderson/Downloads/";
 
-static const string kRPiHost = "127.0.0.1";
+static const string kRPiHost = "192.168.7.52";
 static const int kRPiPort = 5300;
 
 static const float kMapWidthM = 1.0f;
@@ -11,10 +11,12 @@ static const float kMapHeightM = 1.0f;
 static const float kMapOffsetXM = -kMapWidthM / 2.0;
 static const float kMapOffsetYM = -kMapHeightM / 2.0;
 static const ofRectangle kCropBox(ofVec2f(-0.45, -0.4), ofVec2f(0.45, 0.4));
+static const ofRectangle kSafetyBox(ofVec2f(-0.5, -0.45), ofVec2f(0.5, 0.45));
 
-static const bool debugging = false;
+static const bool debugging = true;
 
-static const float kRobotSafetyDiameterM = 0.75f;
+static const float kRobotSafetyDiameterM = 0.15f;
+static const float kRobotOuterSafetyDiameterM = 0.25f;
 
 static const int kNumPathsToSave = 10000;
 
@@ -46,18 +48,25 @@ void ofApp::setup() {
 	cam.setTarget(ofVec3f(0.0));
 	cam.setNearClip(0.01);
 
-//	Robot *r01 = new Robot(1, 30, "Delmar");
-//	robotsById[r01->id] = r01;
-//	robotsByMarker[r01->markerId] = r01;
-//	r01->setCommunication("192.168.7.70", 5111);
+	Robot *r01 = new Robot(1, 23, "Delmar");
+	robotsById[r01->id] = r01;
+	robotsByMarker[r01->markerId] = r01;
+	r01->setCommunication("192.168.7.74", 5111);
 
-	Robot *r02 = new Robot(2, 26, "Archie");
+	Robot *r02 = new Robot(2, 26, "Camille");
 	robotsById[r02->id] = r02;
 	robotsByMarker[r02->markerId] = r02;
 	r02->setCommunication("192.168.7.73", 5111);
 	robotIds.push_back(r02->id);
 
-//	Robot *r03 = new Robot(3, 26, "Camille");
+#if SIMULATING
+	r01->planePos = ofVec2f(-0.35);
+	r02->planePos = ofVec2f(0.35);
+	r01->upVec = ofVec2f(0.0, 1.0);
+	r02->upVec = ofVec2f(0.0, 1.0);
+#endif
+
+//	Robot *r03 = new Robot(3, 24, "Archie");
 //	robotsById[r03->id] = r03;
 //	robotsByMarker[r03->markerId] = r03;
 //	r03->setCommunication("192.168.7.71", 5111);
@@ -107,13 +116,13 @@ void ofApp::setup() {
 		rGui.posLabel = rGui.folder->addLabel(r.positionString());
 		rGui.lastMessageLabel = rGui.folder->addLabel("");
 		rGui.folder->addBreak();
-		rGui.kp = rGui.folder->addSlider("kp", 0, 10000);
+		rGui.kp = rGui.folder->addSlider("kp", 0, 30000);
 		rGui.kp->setValue(r.targetLineKp);
-		rGui.ki = rGui.folder->addSlider("ki", 0, 100);
+		rGui.ki = rGui.folder->addSlider("ki", 0, 2000);
 		rGui.ki->setValue(r.targetLineKi);
-		rGui.kd = rGui.folder->addSlider("kd", 0, 10000);
+		rGui.kd = rGui.folder->addSlider("kd", 0, 50);
 		rGui.kd->setValue(r.targetLineKd);
-		rGui.kMaxI = rGui.folder->addSlider("kMaxI", 0, 10000);
+		rGui.kMaxI = rGui.folder->addSlider("kMaxI", 0, 20000);
 		rGui.kMaxI->setValue(r.targetLineMaxI);
 		rGui.folder->addBreak();
 		rGui.minSpeed = rGui.folder->addSlider("minSpeed", 0, 1024);
@@ -166,14 +175,13 @@ void ofApp::setup() {
     
     ofxDatGuiButton *loadNewMapButton = gui->addButton("Load New Map");
     loadNewMapButton->onButtonEvent([this](ofxDatGuiButtonEvent e) {
-        currentMap->clearStore();
-        string mostRecent = currentMap->getMostRecentMap(filePath);
-        if (mostRecent.size()) {
-            cout << "loading from " << mostRecent << endl;
-            loadMap(mostRecent);
-        } else {
-            loadMap("test.svg");
-        }
+		ofFileDialogResult openFileResult = ofSystemLoadDialog("Select a map svg!");
+		if (openFileResult.bSuccess){
+			cout << "User loaded: " << openFileResult.getPath() << endl;
+			loadMap(openFileResult.getPath());
+		} else {
+			cout << "No map selected" << endl;
+		}
     });
     
 	gui->addFRM();
@@ -189,71 +197,89 @@ void ofApp::setup() {
 	robotReceiver.Bind(5101);
 	robotReceiver.SetNonBlocking(true);
 
-    currentMap = new Map(kMapWidthM, kMapHeightM, kMapOffsetXM, kMapOffsetYM, kCropBox);
+	currentMap = new Map(kMapWidthM, kMapHeightM, kMapOffsetXM, kMapOffsetYM, kCropBox);
+	pathGui = NULL;
 
-    string mostRecent = currentMap->getMostRecentMap(filePath);
-    if (mostRecent.size()) {
-        cout << "loading from " << mostRecent << endl;
-        loadMap(mostRecent);
-    } else {
-        loadMap(currentFile);
-    }
+	string mostRecent = currentMap->getMostRecentMap(kDownloadPath);
+	if (mostRecent.size() > 0) {
+		cout << "Found a recent path in downloads: " << mostRecent << endl;
+		mapPath = mostRecent;
+	} else {
+		mapPath = kDefaultMapPath;
+	}
+	loadMap(mapPath);
 
 	setState(MR_STOPPED);
-    
-    // silence logger:
-    guiLogger->quiet();
-    
-    // set up paths gui
-    pathGui = new ofxDatGui( ofxDatGuiAnchor::TOP_LEFT );
-    pathGui->setTheme(new ofxDatGuiThemeMidnight());
-    
-    pathGui->addHeader("Paths GUI");
-    pathLabel = pathGui->addLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
-    pathStatusLabel = pathGui->addLabel("");
-    drawnPathLabel = pathGui->addLabel("");
-    
-    pathGui->addBreak();
-    
-    int dropdown_index;
-    vector<string> opts;
-    for (auto &p : robotsById) {
-        int id = p.first;
-        Robot &r = *p.second;
-        
-        // note: don't change the order of label. datGuiDropdown event handler is broken so we have to parse the string to get the selected ID
-        opts.push_back(ofToString(id) + " ID ROBOT - " + ofToString(r.name));
-        dropDownToRobotId[dropdown_index] = r.id;
-        cout << r.id << endl;
-        cout << "dropDownToRobotId[dropdown_index] " << dropDownToRobotId[dropdown_index] << endl;
-        dropdown_index++;
-    }
+}
 
-    for (int i=0; i<currentMap->pathTypes.size(); i++) {
-        PathGui &pGui = pathGuis[i];
-        
-        string pathName = currentMap->pathTypes[i];
-        
-        pGui.togglePath = pathGui->addToggle("PATH: " + ofToString(pathName) + " \t\t- " + ofToString(currentMap->getPathCount(pathName)));
-        pGui.togglePath->setChecked(true);
-        
-        if (opts.size()) {
-            pGui.drawOptions = pathGui->addDropdown("Select Robot:", opts);
-            // defaults to first robot for all paths
-            // TODO: divy up paths differently?
-            int initial = 0;
-            pGui.drawOptions->select(initial);
-            currentMap->pathAssignment[pathName] = dropDownToRobotId[initial];
-        }
-        
-        pathGui->addBreak();
-        
-        pGui.togglePath->onToggleEvent([this, pathName](ofxDatGuiToggleEvent e) {
-            currentMap->setPathActive(pathName, e.checked);
-        });
-    }
-    
-    pathGui->addFooter();
+void ofApp::loadMap(const string &newMapPath) {
+	mapPath = newMapPath;
+	currentMap->loadMap(mapPath);
+
+	for (auto &p : robotsById) {
+		int id = p.first;
+		Robot &r = *p.second;
+
+		r.stop();
+		r.pathTypes.clear();
+		for (auto pathType : currentMap->pathTypes) {
+			r.addPathType(pathType);
+		}
+	}
+
+	setupMapGui();
+}
+
+void ofApp::setupMapGui() {
+	// silence logger:
+	guiLogger->quiet();
+
+	// set up paths gui
+	if (pathGui) {
+		delete pathGui;
+	}
+
+	pathGui = new ofxDatGui( ofxDatGuiAnchor::TOP_LEFT );
+	pathGui->setTheme(new ofxDatGuiThemeMidnight());
+
+	pathGui->addHeader("Paths GUI");
+	pathLabel = pathGui->addLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
+	pathStatusLabel = pathGui->addLabel("");
+	drawnPathLabel = pathGui->addLabel("");
+
+	pathGui->addBreak();
+
+	pathGuis.clear();
+	for (auto &pathType : currentMap->pathTypes) {
+		PathGui pGui;
+		pGui.pathType = pathType;
+
+		pGui.toggle = pathGui->addToggle("PATH: " + ofToString(pathType) + " \t\t- " + ofToString(currentMap->getPathCount(pathType)));
+		pGui.toggle->setChecked(true);
+		pGui.toggle->onToggleEvent([&pathType, this](ofxDatGuiToggleEvent e) {
+			currentMap->setPathActive(pathType, e.checked);
+		});
+
+		pGui.folder = pathGui->addFolder("Robot Select");
+		for (auto &pair : robotsById) {
+			Robot &r = *pair.second;
+
+			ofxDatGuiToggle *t = pGui.folder->addToggle(r.name + " (" + ofToString(r.id) + ")");
+			t->setChecked(true);
+			t->onToggleEvent([&r, &pathType](ofxDatGuiToggleEvent e) {
+				if (e.checked) {
+					r.addPathType(pathType);
+				} else {
+					r.removePathType(pathType);
+				}
+			});
+		}
+
+		pathGui->addBreak();
+		pathGuis[pathType] = pGui;
+	}
+
+	pathGui->addFooter();
 }
 
 void ofApp::exit() {
@@ -279,11 +305,15 @@ void ofApp::setState(MaproomState newState) {
 }
 
 //--------------------------------------------------------------
-void ofApp::update(){
+void ofApp::update() {
+#if SIMULATING
+	for (auto &p : robotsById) {
+		p.second->updateSimulation(ofGetLastFrameTime());
+	}
+#endif
 	handleOSC();
 	receiveFromRobots();
 	commandRobots();
-    receiveGuiUpdates();
 	updateGui();
 }
 
@@ -446,7 +476,7 @@ void ofApp::planRobotPaths() {
 		Robot &r = *p.second;
 
 		if (r.state == R_READY_TO_POSITION) {
-			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading);
+			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading, r.pathTypes);
 			robotPaths[id] = mp;
 
 			if (r.path.size() > 0) {
@@ -516,6 +546,71 @@ void ofApp::commandRobots() {
 		int id = p.first;
 		Robot &r = *p.second;
 
+		for (auto &p2 : robotsById) {
+			int id2 = p2.first;
+			if (id == id2) continue;
+
+			Robot &r2 = *p2.second;
+
+			float dist = r.planePos.distance(r2.planePos);
+			if (dist < kRobotSafetyDiameterM) {
+				// Too close! Stop entirely.
+				r.stop();
+				r2.stop();
+				cout << "Stopping both robots, way too close " << dist << endl;
+			} else if (dist < kRobotOuterSafetyDiameterM) {
+				// Noone is drawing
+				ofVec2f oneToTwo = r2.planePos - r.planePos;
+				ofVec2f midpoint = oneToTwo / 2.0 + r.planePos;
+				oneToTwo.normalize();
+
+				bool success = false;
+
+				ofVec2f r2left = r2.planePos + oneToTwo.rotate(-90) * 0.25f;
+				ofVec2f r2right = r2.planePos + oneToTwo.rotate(90) * 0.25f;
+				if (!success && r2.state != R_DRAWING) {
+					if (kSafetyBox.inside(r2left)) {
+						unclaimPath(id);
+						unclaimPath(id2);
+						r2.navigateTo(r2left);
+						r.stop();
+						success = true;
+					} else if (kSafetyBox.inside(r2right)) {
+						unclaimPath(id);
+						unclaimPath(id2);
+						r2.navigateTo(r2right);
+						r.stop();
+						success = true;
+					}
+				}
+
+				if (!success && r.state != R_DRAWING) {
+					ofVec2f r1left = r.planePos + oneToTwo.rotate(90) * 0.25f;
+					ofVec2f r1right = r.planePos + oneToTwo.rotate(-90) * 0.25f;
+					if (kSafetyBox.inside(r1left)) {
+						unclaimPath(id);
+						unclaimPath(id2);
+						r.navigateTo(r1left);
+						r2.stop();
+						success = true;
+					} else if (kSafetyBox.inside(r1right)) {
+						unclaimPath(id);
+						unclaimPath(id2);
+						r.navigateTo(r1right);
+						r2.stop();
+						success = true;
+					}
+				}
+
+				// Couldn't force robots to renavigate around each other
+				if (!success) {
+					r.stop();
+					r2.stop();
+					cout << "Stopping both robots " << dist << endl;
+				}
+			}
+		}
+
 		// Determine draw state
 		if (state == MR_STOPPED) {
 			unclaimPath(id);
@@ -524,7 +619,7 @@ void ofApp::commandRobots() {
 			unclaimPath(id);
 			r.start();
 		} else if (r.state == R_READY_TO_POSITION && state == MR_RUNNING) {
-			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading);
+			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading, { "major_road" });
 			robotPaths[id] = mp;
 
 			if (mp != NULL) {
@@ -606,19 +701,6 @@ void ofApp::commandRobots() {
 	}
 }
 
-void ofApp::receiveGuiUpdates() {
-    // event handler for dropdown is broken so this is a hack
-    // https://www.bountysource.com/issues/31521059-ofxdatguidropdown-not-collapsing-after-select-when-added-to-ofxdatgui
-    
-    for (int i=0; i<currentMap->pathTypes.size(); i++) {
-        PathGui &pGui = pathGuis[i];
-        ofxDatGuiDropdownOption selected = *pGui.drawOptions->getSelected();
-        
-        int selectedRobot = atoi(ofToString(selected.getLabel()[0]).c_str());
-        currentMap->pathAssignment[currentMap->pathTypes[i]] = selectedRobot;
-    }
-}
-
 void ofApp::updateGui() {
 	char buf[1024];
 	sprintf(buf, "%s (%.2f)", stateString().c_str(), ofGetElapsedTimef() - stateStartTime);
@@ -629,22 +711,22 @@ void ofApp::updateGui() {
     int activePaths = currentMap->getActivePathCount();
     int drawnPaths = currentMap->getDrawnPaths();
     int pathsLeft = activePaths - drawnPaths;
-    float percentage = (activePaths > 0 ? float(drawnPaths) / float(activePaths) : 100);
+    float percentage = (activePaths > 0 ? float(drawnPaths) / float(activePaths) : 1.0);
     
     sprintf(buf, "Drawn (active) Paths: %d", drawnPaths);
     pathStatusLabel->setLabel(buf);
     
-    sprintf(buf, "Active Paths Remaining %d, percentage drawn: %.2f%%", drawnPaths, percentage);
+    sprintf(buf, "Active Paths Remaining %d, percentage drawn: %.1f%%", drawnPaths, percentage * 100);
     drawnPathLabel->setLabel(buf);
     
-    static const ofColor enabled(50, 50, 100), disabled(50, 50, 50);
-    
-    for (int i=0; i<currentMap->pathTypes.size(); i++) {
-        PathGui &pGui = pathGuis[i];
-        bool pathActive = currentMap->activePaths[currentMap->pathTypes[i]];
-        pGui.togglePath->setBackgroundColor(pathActive ? enabled : disabled);
-        pGui.drawOptions->setBackgroundColor(pathActive ? enabled : disabled);
-    }
+//    static const ofColor enabled(50, 50, 100), disabled(50, 50, 50);
+//    
+//    for (int i=0; i<currentMap->pathTypes.size(); i++) {
+//        PathGui &pGui = pathGuis[i];
+//        bool pathActive = currentMap->activePaths[currentMap->pathTypes[i]];
+//        pGui.togglePath->setBackgroundColor(pathActive ? enabled : disabled);
+//        pGui.drawOptions->setBackgroundColor(pathActive ? enabled : disabled);
+//    }
 }
 
 string ofApp::stateString() {
@@ -678,7 +760,7 @@ void ofApp::draw(){
             } else if (j.claimed) {
                 ofSetColor(200, 0, 200, 100);
             } else if(!currentMap->activePaths[i.first]) {
-                ofSetColor(0, 0, 0);
+				continue;
             } else {
                 ofSetColor(90, 90, 90);
             }
@@ -780,15 +862,6 @@ void ofApp::draw(){
     
 	ofSetColor(255, 255, 255);
 	ofDrawBitmapString(posstr.str(), 10, 15);
-}
-
-void ofApp::loadMap(const string &mapName) {
-    currentMap->loadMap(mapName);
-    
-    for (auto &p : robotsById) {
-        int id = p.first;
-        Robot &r = *p.second;
-    }
 }
 
 //--------------------------------------------------------------

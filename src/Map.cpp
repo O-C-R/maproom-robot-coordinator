@@ -101,6 +101,7 @@ bool CohenSutherlandLineClip(ofVec2f &pt1, ofVec2f &pt2, const ofRectangle &rect
 Map::Map(float width, float height, float offsetX, float offsetY, ofRectangle crop):
 	widthM(width), heightM(height),
 	offsetX(offsetX), offsetY(offsetY),
+	origOffsetX(offsetX), origOffsetY(offsetY),
 	svgExtentMin(10000), svgExtentMax(-10000),
 	storeCount(0), pathCount(0),
 	cropBox(crop)
@@ -307,9 +308,8 @@ void Map::optimizePaths(float percentDiff) {
 }
 
 void Map::clearStore() {
-    for (int i=0; i < pathTypes.size(); i++) {
-        mapPathStore[pathTypes[i]].clear();
-    }
+	activePaths.clear();
+	mapPathStore.clear();
     pathTypes.clear();
 }
 
@@ -343,9 +343,12 @@ string Map::getMostRecentMap(string filePath) {
 }
 
 void Map::loadMap(const string filename) {
+	currentMap.clear();
     currentMap.loadFile(filename);
 	scaleX = 1.0;
 	scaleY = 1.0;
+	offsetX = 0.0;
+	offsetY = 0.0;
 	svgExtentMin = ofVec2f(10000);
 	svgExtentMax = ofVec2f(-10000);
 
@@ -474,7 +477,7 @@ void Map::loadMap(const string filename) {
     }
     currentMap.popTag();
 
-	rescaleMap(widthM, heightM, offsetX, offsetY);
+	rescaleMap(widthM, heightM, origOffsetX, origOffsetY);
 }
 
 void Map::rescaleMap(float width, float height, float newOffsetX, float newOffsetY) {
@@ -538,24 +541,24 @@ void Map::rescaleMap(float width, float height, float newOffsetX, float newOffse
 //    cout << "post optimize count: " << getPathCount() << endl;
 }
 
-MapPath* Map::nextPath(const ofVec2f &pos, int robotId, float lastHeading) {
+MapPath* Map::nextPath(const ofVec2f &pos, int robotId, float lastHeading, const set<string> &pathTypes) {
     MapPath *next = NULL;
     vector<MapPath*> contenders;
     float minDist = INFINITY;
     
     int checkedPath = 0;
-    for (auto &path : pathTypes) {
-        if (mapPathStore.find(path) == mapPathStore.end()) {
+    for (auto &pathType : pathTypes) {
+        if (mapPathStore.find(pathType) == mapPathStore.end()) {
             continue;
         }
     
-        // check if path is active and that it belongs to the robotId
-        if (!activePaths[path] || pathAssignment[path] != robotId) {
+        // check if path is active and that the robot id can draw it
+		if (!activePaths[pathType] || pathTypes.find(pathType) == pathTypes.end()) {
             continue;
         }
 
         // check if robot has that
-        for (auto &mapPath : mapPathStore[path]) {
+        for (auto &mapPath : mapPathStore[pathType]) {
             if (mapPath.claimed || mapPath.drawn) {
                 continue;
             }
