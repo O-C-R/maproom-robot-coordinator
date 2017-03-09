@@ -236,6 +236,9 @@ void Robot::setState(RobotState newState) {
 	state = newState;
 	cout << stateString() << endl;
 
+	// Reset PID on all state changes
+	targetLinePID.reset();
+
 	stateStartTime = ofGetElapsedTimef();
 }
 
@@ -255,7 +258,9 @@ void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 	const float distToLine = dirToLine.length();
 	const double targetLinePIDOutput = targetLinePID.getOutput(distToLine, 0.0);
 	backToLine = targetLinePIDOutput * ofVec2f(dirToLine).normalize() * -1.0;
-	backToLine *= ofMap(distanceToEnd, 0, 1, 0.5, 2.0, true);
+
+	// Apply a weighting where the line following is stronger at the start
+	backToLine *= ofMap(distanceToEnd, 0, 0.2, 0.5, 2.0, true);
 
 	// Combine the two vectors
 	movement = (vecToEnd + backToLine).normalize() * forwardMag;
