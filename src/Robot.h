@@ -12,6 +12,7 @@
 #include "ofMain.h"
 #include "ofxUDPManager.h"
 #include "MiniPID.h"
+#include "Constants.h"
 
 static const float kMetersPerInch = 0.0254;
 static const float kMarkerSizeIn = 5.0;
@@ -51,6 +52,9 @@ public:
 
 	// Update from CV
 	void updateCamera(const ofVec2f &imPos, const ofVec2f &imUp);
+
+	// Update simulation
+	void updateSimulation(float dt);
 
 	// Update during loop
 	void update();

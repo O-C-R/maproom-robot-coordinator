@@ -44,6 +44,13 @@ void ofApp::setup() {
 	robotsByMarker[r02->markerId] = r02;
 	r02->setCommunication("192.168.7.73", 5111);
 
+#if SIMULATING
+	r01->planePos = ofVec2f(-0.35);
+	r02->planePos = ofVec2f(0.35);
+	r01->upVec = ofVec2f(0.0, 1.0);
+	r02->upVec = ofVec2f(0.0, 1.0);
+#endif
+
 //	Robot *r03 = new Robot(3, 24, "Archie");
 //	robotsById[r03->id] = r03;
 //	robotsByMarker[r03->markerId] = r03;
@@ -283,7 +290,12 @@ void ofApp::setState(MaproomState newState) {
 }
 
 //--------------------------------------------------------------
-void ofApp::update(){
+void ofApp::update() {
+#if SIMULATING
+	for (auto &p : robotsById) {
+		p.second->updateSimulation(ofGetLastFrameTime());
+	}
+#endif
 	handleOSC();
 	receiveFromRobots();
 	commandRobots();

@@ -218,12 +218,26 @@ void Robot::updateCamera(const ofVec2f &imPos, const ofVec2f &imUp) {
 	lastCameraUpdateTime = now;
 }
 
+void Robot::updateSimulation(float dt) {
+	const float unitsPerSec = 0.2;
+	if (state == R_POSITIONING || state == R_DRAWING) {
+		// TODO: add noise?
+		planePos += (targetPlanePos - startPlanePos).normalize() * dt * unitsPerSec;
+	}
+
+	updateCamera(planePos, upVec);
+}
+
 void Robot::gotHeartbeat() {
 	lastHeartbeatTime = ofGetElapsedTimef();
 }
 
 bool Robot::commsUp() {
-	return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
+	if (SIMULATING) {
+		return true;
+	} else {
+		return ofGetElapsedTimef() - lastHeartbeatTime < kHeartbeatTimeoutSec;
+	}
 }
 
 bool Robot::cvDetected() {
@@ -232,7 +246,11 @@ bool Robot::cvDetected() {
 }
 
 void Robot::setState(RobotState newState) {
-	cout << "State change " << stateString() << " -> ";
+	if (newState == state) {
+		return;
+	}
+
+	cout << "Robot " << id << ": " << stateString() << " -> ";
 	state = newState;
 	cout << stateString() << endl;
 
@@ -294,7 +312,6 @@ bool Robot::inPosition(const ofVec2f &pos) {
 void Robot::navigateTo(const ofVec2f &target) {
 	startPlanePos = avgPlanePos;
 	targetPlanePos = target;
-	targetLinePID.reset();
 
     setState(R_POSITIONING);
 }
@@ -302,7 +319,6 @@ void Robot::navigateTo(const ofVec2f &target) {
 void Robot::drawLine(const ofVec2f &start, const ofVec2f &end) {
 	startPlanePos = start;
 	targetPlanePos = end;
-	targetLinePID.reset();
 
 	setState(R_DRAWING);
 }

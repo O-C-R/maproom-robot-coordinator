@@ -147,6 +147,7 @@
 		712C50F71E693067008885F1 /* MiniPID.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MiniPID.h; sourceTree = "<group>"; };
 		712C50F81E693067008885F1 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		712C50FB1E69E9AB008885F1 /* Util.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Util.h; sourceTree = "<group>"; };
+		716B8F4C1E70DEEF0056A27F /* Constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Constants.h; sourceTree = "<group>"; };
 		7179F8801E665CBD00C68E2C /* ArucoMarker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ArucoMarker.cpp; sourceTree = "<group>"; };
 		7179F8811E665CBD00C68E2C /* ArucoMarker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArucoMarker.h; sourceTree = "<group>"; };
 		744031A3E8F8DAF9FE6F3EA8 /* ofxDatGuiGroups.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiGroups.h; path = ../../../addons/ofxDatGui/src/components/ofxDatGuiGroups.h; sourceTree = SOURCE_ROOT; };
@@ -679,6 +680,7 @@
 				7179F8801E665CBD00C68E2C /* ArucoMarker.cpp */,
 				7179F8811E665CBD00C68E2C /* ArucoMarker.h */,
 				712C50FB1E69E9AB008885F1 /* Util.h */,
+				716B8F4C1E70DEEF0056A27F /* Constants.h */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;

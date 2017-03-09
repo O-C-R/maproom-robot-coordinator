@@ -6,6 +6,7 @@
 #include "ofxUDPManager.h"
 #include "ofxJSON.h"
 
+#include "Constants.h"
 #include "Robot.h"
 #include "Map.h"
 #include "ArucoMarker.h"
