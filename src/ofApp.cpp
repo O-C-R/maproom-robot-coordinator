@@ -468,6 +468,9 @@ void ofApp::commandRobots() {
 		} else if (r.state == R_STOPPED && state == MR_RUNNING) {
 			unclaimPath(id);
 			r.start();
+		} else if (!kSafetyBox.inside(r.planePos) && r.state != R_STOPPED) {
+			r.stop();
+			cout << "Stopping " << id << ", outside the box." << endl;
 		} else if (r.state == R_READY_TO_POSITION && state == MR_RUNNING) {
 			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading, { "major_road" });
 			robotPaths[id] = mp;
