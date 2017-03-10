@@ -19,6 +19,13 @@ typedef enum MaproomState {
 	MR_STOPPED
 } MaproomState;
 
+typedef enum RPiState {
+	RPI_UNKNOWN = -1,
+	RPI_TRACKING = 0,
+	RPI_FLASHLIGHT = 1,
+	N_RPI_STATES = 2
+} RPiState;
+
 typedef struct RobotGui {
 	ofxDatGuiFolder *folder;
 
@@ -66,6 +73,7 @@ class ofApp : public ofBaseApp{
 	void handleOSC();
 	void receiveFromRobots();
 	void commandRobots();
+	void sendRobotsToCorners();
 
 	void loadMap(const string &newMapPath);
 	void setupMapGui();
@@ -100,6 +108,7 @@ private:
     ofxDatGui *pathGui;
 	ofxDatGuiLabel *stateLabel, *pathLabel, *drawnPathLabel, *pathStatusLabel;
 	ofxDatGuiButton *startButton, *pauseButton, *stopButton;
+	ofxDatGuiLabel *rpiStateLabel;
 	ofxDatGuiDropdown *rpiStateDropdown;
 	ofxDatGuiFolder *robotConstantsFolder;
 	ofxDatGuiSlider *kpSlider, *kiSlider, *kdSlider, *kMaxISlider;
@@ -114,4 +123,7 @@ private:
 
 	MaproomState state;
 	float stateStartTime;
+
+	RPiState rpiState;
+	float rpiLastStateMessageTime;
 };

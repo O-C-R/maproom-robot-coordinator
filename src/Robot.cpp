@@ -86,12 +86,13 @@ Robot::Robot(int rId, int mId, const string &n) :
 	lastCameraUpdateTime(-1000),
 	cvFramerate(0),
 	lastHeartbeatTime(-1000),
-	targetLineKp(20000.0),
-	targetLineKi(500),
-	targetLineKd(0),
-	targetLineMaxI(5000.0),
-	targetLinePID(targetLineKp, targetLineKi, targetLineKd)
+	targetLineKp(14000),
+	targetLineKi(1700),
+	targetLineKd(0.1),
+	targetLineMaxI(5000),
+	targetLinePID(0,0,0)
 {
+	targetLinePID.setPID(targetLineKp, targetLineKi, targetLineKd);
 	targetLinePID.setMaxIOutput(targetLineMaxI);
 
 }
@@ -102,6 +103,7 @@ void Robot::updatePID(float kp, float ki, float kd, float maxI) {
 	targetLineKd = ki;
 	targetLineMaxI = maxI;
 
+	targetLinePID.reset();
 	targetLinePID.setPID(kp, kd, ki);
 	targetLinePID.setMaxIOutput(targetLineMaxI);
 }
@@ -254,9 +256,6 @@ void Robot::setState(RobotState newState) {
 	state = newState;
 	cout << stateString() << endl;
 
-	// Reset PID on all state changes
-	targetLinePID.reset();
-
 	stateStartTime = ofGetElapsedTimef();
 }
 
@@ -278,7 +277,7 @@ void Robot::moveRobot(char *msg, bool drawing, bool &shouldSend) {
 	backToLine = targetLinePIDOutput * ofVec2f(dirToLine).normalize() * -1.0;
 
 	// Apply a weighting where the line following is stronger at the start
-	backToLine *= ofMap(distanceToEnd, 0, 0.2, 0.5, 2.0, true);
+	backToLine *= ofMap(distanceToEnd, 0, 0.25, 0.25, 1.0, true);
 
 	// Combine the two vectors
 	movement = (vecToEnd + backToLine).normalize() * forwardMag;
@@ -313,12 +312,20 @@ void Robot::navigateTo(const ofVec2f &target) {
 	startPlanePos = avgPlanePos;
 	targetPlanePos = target;
 
+	targetLinePID.reset();
+	targetLinePID.setMaxIOutput(0);
+	targetLinePID.setMaxIOutput(targetLineMaxI);
+
     setState(R_POSITIONING);
 }
 
 void Robot::drawLine(const ofVec2f &start, const ofVec2f &end) {
 	startPlanePos = start;
 	targetPlanePos = end;
+
+	targetLinePID.reset();
+	targetLinePID.setMaxIOutput(0);
+	targetLinePID.setMaxIOutput(targetLineMaxI);
 
 	setState(R_DRAWING);
 }

@@ -11,17 +11,31 @@ static const float kMapHeightM = 1.0f;
 static const float kMapOffsetXM = -kMapWidthM / 2.0;
 static const float kMapOffsetYM = -kMapHeightM / 2.0;
 static const ofRectangle kCropBox(ofVec2f(-0.45, -0.4), ofVec2f(0.45, 0.4));
+static const ofRectangle kRetreatCornerBox(ofVec2f(-0.4, -0.35), ofVec2f(0.4, 0.35));
 static const ofRectangle kSafetyBox(ofVec2f(-0.5, -0.45), ofVec2f(0.5, 0.45));
 
 static const bool debugging = true;
 
-static const float kRobotSafetyDiameterM = 0.15f;
-static const float kRobotOuterSafetyDiameterM = 0.25f;
+static const float kRobotSafetyDiameter = 0.18f;
+static const float kRobotOuterSafetyDiameter = 0.25f;
 
 static const int kNumPathsToSave = 10000;
 
 static char udpMessage[1024];
 static char buf[1024];
+
+string rpiStateToString(RPiState state) {
+	switch (state) {
+		case RPI_UNKNOWN:
+			return "RPI_UNKNOWN";
+		case RPI_TRACKING:
+			return "RPI_TRACKING";
+		case RPI_FLASHLIGHT:
+			return "RPI_FLASHLIGHT";
+		default:
+			return "UNKNOWN STATE!";
+	}
+}
 
 //--------------------------------------------------------------
 
@@ -40,11 +54,13 @@ void ofApp::setup() {
 	robotsById[r01->id] = r01;
 	robotsByMarker[r01->markerId] = r01;
 	r01->setCommunication("192.168.7.74", 5111);
+	r01->planePos = ofVec2f(-2);
 
 	Robot *r02 = new Robot(2, 26, "Camille");
 	robotsById[r02->id] = r02;
 	robotsByMarker[r02->markerId] = r02;
 	r02->setCommunication("192.168.7.73", 5111);
+	r02->planePos = ofVec2f(2);
 
 #if SIMULATING
 	r01->planePos = ofVec2f(-0.35);
@@ -79,7 +95,11 @@ void ofApp::setup() {
 		setState(MR_STOPPED);
 	});
 
-	rpiStateDropdown = gui->addDropdown("RPi State", { "Tracking", "Flashlight" });
+	gui->addBreak();
+
+	rpiStateLabel = gui->addLabel("RPi State");
+
+	rpiStateDropdown = gui->addDropdown("Set RPi State", { "Tracking", "Flashlight" });
 	rpiStateDropdown->select(0);
 	rpiStateDropdown->onDropdownEvent([this](ofxDatGuiDropdownEvent e) {
 		int index = e.target->getSelected()->getIndex();
@@ -113,7 +133,7 @@ void ofApp::setup() {
 	robotConstantsFolder = gui->addFolder("Robot Constants");
 	kpSlider = robotConstantsFolder->addSlider("kp", 0, 30000);
 	kpSlider->setValue(r01->targetLineKp);
-	kiSlider = robotConstantsFolder->addSlider("ki", 0, 2000);
+	kiSlider = robotConstantsFolder->addSlider("ki", 0, 5000);
 	kiSlider->setValue(r01->targetLineKi);
 	kdSlider = robotConstantsFolder->addSlider("kd", 0, 50);
 	kdSlider->setValue(r01->targetLineKd);
@@ -210,6 +230,7 @@ void ofApp::setup() {
 	}
 	loadMap(mapPath);
 
+	rpiState = RPI_UNKNOWN;
 	setState(MR_STOPPED);
 }
 
@@ -377,17 +398,65 @@ void ofApp::handleOSC() {
 				}
 				markersById[markerId].updateCamera(rawPos, rawUp);
 			}
+		} else if ( m.getAddress() == "/state" ) {
+			string msg = m.getArgAsString(0);
+			jsonMsg.parse(msg);
+			int state = jsonMsg["state"].asInt();
+			if (state >= 0 && state < N_RPI_STATES) {
+				rpiState = (RPiState)state;
+			} else {
+
+			}
+
+			rpiLastStateMessageTime = ofGetElapsedTimef();
+
 		}
 	}
 }
 
 void ofApp::unclaimPath(int robotId) {
-	if (robotPaths.find(robotId) == robotPaths.end()) {
+	if (robotPaths.find(robotId) != robotPaths.end()) {
 		MapPath *mp = robotPaths[robotId];
 		if (mp != NULL && mp->claimed && !mp->drawn) {
 			mp->claimed = false;
 		}
-		robotPaths.erase(robotId);
+		robotPaths.erase(robotPaths.find(robotId));
+	}
+}
+
+void ofApp::sendRobotsToCorners() {
+	int robotsAssigned = 0;
+
+	vector<ofVec2f> corners = { kRetreatCornerBox.getTopLeft(), kRetreatCornerBox.getTopRight(), kRetreatCornerBox.getBottomRight(), kRetreatCornerBox.getBottomLeft() };
+	vector<bool> taken = { false, false, false, false };
+	while (robotsAssigned < robotsById.size()) {
+		float minDist = 10000000;
+		int whichCorner = -1;
+		int whichRobot = -1;
+
+		for (auto &p : robotsById) {
+			Robot &r = *p.second;
+
+			for (int cornerId = 0; cornerId < corners.size(); ++cornerId) {
+				if (taken[cornerId]) continue;
+
+				float d = corners[cornerId].distance(r.planePos);
+				if (d < minDist) {
+					minDist = d;
+					whichCorner = cornerId;
+					whichRobot = p.first;
+				}
+			}
+		}
+
+		if (whichRobot < 0 || whichCorner < 0) {
+			cout << "Didn't find a corner, abort" << endl;
+			break;
+		}
+
+		robotsById[whichRobot]->navigateTo(corners[whichCorner]);
+		taken[whichCorner] = true;
+		robotsAssigned++;
 	}
 }
 
@@ -403,61 +472,16 @@ void ofApp::commandRobots() {
 			Robot &r2 = *p2.second;
 
 			float dist = r.planePos.distance(r2.planePos);
-			if (dist < kRobotSafetyDiameterM) {
+			if (dist < kRobotSafetyDiameter) {
 				// Too close! Stop entirely.
 				r.stop();
 				r2.stop();
 				cout << "Stopping both robots, way too close " << dist << endl;
-			} else if (dist < kRobotOuterSafetyDiameterM) {
-//				// Noone is drawing
-//				ofVec2f oneToTwo = r2.planePos - r.planePos;
-//				ofVec2f midpoint = oneToTwo / 2.0 + r.planePos;
-//				oneToTwo.normalize();
-//
-//				bool success = false;
-//
-//				ofVec2f r2left = r2.planePos + oneToTwo.rotate(-90) * 0.25f;
-//				ofVec2f r2right = r2.planePos + oneToTwo.rotate(90) * 0.25f;
-//				if (!success && r2.state != R_DRAWING) {
-//					if (kSafetyBox.inside(r2left)) {
-//						unclaimPath(id);
-//						unclaimPath(id2);
-//						r2.navigateTo(r2left);
-//						r.stop();
-//						success = true;
-//					} else if (kSafetyBox.inside(r2right)) {
-//						unclaimPath(id);
-//						unclaimPath(id2);
-//						r2.navigateTo(r2right);
-//						r.stop();
-//						success = true;
-//					}
-//				}
-//
-//				if (!success && r.state != R_DRAWING) {
-//					ofVec2f r1left = r.planePos + oneToTwo.rotate(90) * 0.25f;
-//					ofVec2f r1right = r.planePos + oneToTwo.rotate(-90) * 0.25f;
-//					if (kSafetyBox.inside(r1left)) {
-//						unclaimPath(id);
-//						unclaimPath(id2);
-//						r.navigateTo(r1left);
-//						r2.stop();
-//						success = true;
-//					} else if (kSafetyBox.inside(r1right)) {
-//						unclaimPath(id);
-//						unclaimPath(id2);
-//						r.navigateTo(r1right);
-//						r2.stop();
-//						success = true;
-//					}
-//				}
-//
-//				// Couldn't force robots to renavigate around each other
-//				if (!success) {
-//					r.stop();
-//					r2.stop();
-//					cout << "Stopping both robots " << dist << endl;
-//				}
+			} else if (dist < kRobotOuterSafetyDiameter) {
+				unclaimPath(id);
+				unclaimPath(id2);
+
+				sendRobotsToCorners();
 			}
 		}
 
@@ -472,7 +496,7 @@ void ofApp::commandRobots() {
 			r.stop();
 			cout << "Stopping " << id << ", outside the box." << endl;
 		} else if (r.state == R_READY_TO_POSITION && state == MR_RUNNING) {
-			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading, { "major_road" });
+			MapPath *mp = currentMap->nextPath(r.avgPlanePos, r.id, r.lastHeading, r.pathTypes);
 			robotPaths[id] = mp;
 
 			if (mp != NULL) {
@@ -512,7 +536,7 @@ void ofApp::commandRobots() {
 					r.stop();
 				} else {
 					mp->drawn = true;
-					robotPaths.erase(id);
+					robotPaths.erase(robotPaths.find(id));
                     if (debugging) {
                         r.planePos = mp->segment.end;
                         r.avgPlanePos = mp->segment.end;
@@ -556,8 +580,11 @@ void ofApp::commandRobots() {
 
 void ofApp::updateGui() {
 	char buf[1024];
-	sprintf(buf, "%s (%.2f)", stateString().c_str(), ofGetElapsedTimef() - stateStartTime);
+	sprintf(buf, "MR: %s (%.2f)", stateString().c_str(), ofGetElapsedTimef() - stateStartTime);
 	stateLabel->setLabel(buf);
+
+	sprintf(buf, "RPi: %s (%.2f)", rpiStateToString(rpiState).c_str(), ofGetElapsedTimef() - rpiLastStateMessageTime);
+	rpiStateLabel->setLabel(buf);
     
     pathLabel->setLabel("Total Active Paths: " + ofToString(currentMap->getActivePathCount()));
     
